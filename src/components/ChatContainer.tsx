@@ -32,7 +32,6 @@ export function ChatContainer({ conversation, isStreaming }: ChatContainerProps)
             </span>
           </h2>
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Sparkles className="h-4 w-4" />
             <p>Ask anything and I'll help you find answers.</p>
           </div>
           <div className="flex flex-wrap gap-2 justify-center pt-4">
