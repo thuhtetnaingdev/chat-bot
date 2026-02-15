@@ -40,7 +40,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {isUser ? <User className="h-4 w-4" /> : <Terminal className="h-4 w-4" />}
         </div>
         
-        <div className="flex flex-col gap-1.5 min-w-0 max-w-full">
+        <div className="flex flex-col gap-1.5 min-w-0 max-w-full overflow-hidden">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             {isUser ? 'You' : (message.model ? message.model.split('/').pop() : 'Assistant')}
             <span className="text-[10px] opacity-50">
@@ -58,7 +58,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           >
             <div className={isUser ? 'px-3 py-2' : 'p-4'}>
               {isUser ? (
-                <p className="whitespace-pre-wrap leading-relaxed text-sm">{message.content}</p>
+                <p className="whitespace-pre-wrap break-words leading-relaxed text-sm">{message.content}</p>
               ) : (
                 <div className="flex flex-col gap-4">
                   {thinking && (
@@ -79,7 +79,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                       </Button>
                       {showThinking && (
                         <div className="rounded-lg border border-border/50 bg-muted/40 p-3">
-                          <pre className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed font-mono">
+                          <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono">
                             {thinking}
                           </pre>
                         </div>
@@ -87,7 +87,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     </div>
                   )}
                   
-                  <div className={cn('prose prose-sm dark:prose-invert max-w-none', thinking && showThinking ? '' : '')}>
+                  <div className="prose prose-sm dark:prose-invert max-w-none" style={{ overflowWrap: 'anywhere' }}>
                     <ReactMarkdown
                       components={{
                         code(prop) {
@@ -121,7 +121,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                           )
                         },
                         p({ children }) {
-                          return <p className="mb-2 last:mb-0 leading-relaxed text-sm">{children}</p>
+                          return <p className="mb-2 last:mb-0 leading-relaxed text-sm" style={{ overflowWrap: 'anywhere' }}>{children}</p>
                         },
                         ul({ children }) {
                           return <ul className="mb-2 ml-4 list-disc space-y-0.5">{children}</ul>
@@ -130,7 +130,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                           return <ol className="mb-2 ml-4 list-decimal space-y-0.5">{children}</ol>
                         },
                         li({ children }) {
-                          return <li className="leading-relaxed text-sm">{children}</li>
+                          return <li className="leading-relaxed text-sm" style={{ overflowWrap: 'anywhere' }}>{children}</li>
                         },
                         h1({ children }) {
                           return <h1 className="mb-2 mt-3 text-lg font-bold">{children}</h1>
@@ -155,6 +155,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-primary underline underline-offset-2 text-xs hover:text-primary/80"
+                              style={{ overflowWrap: 'anywhere' }}
                             >
                               {children}
                             </a>
