@@ -13,7 +13,7 @@ interface MessageBubbleProps {
 }
 
 function parseThinkingContent(content: string): { thinking: string | null, response: string } {
-  const thinkPattern = /thinking([\s\S]*?)<\/thinking>/i
+  const thinkPattern = /<think>([\s\S]*?)<\/think>/i
   const thinkMatch = content.match(thinkPattern)
   if (thinkMatch) {
     return {
@@ -34,15 +34,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const { thinking, response } = parseThinkingContent(message.content)
 
   return (
-    <div className={cn('flex w-full gap-3 py-6', isUser ? 'justify-end' : 'justify-start')}>
-      <div className={cn('flex gap-3 max-w-[90%] md:max-w-[80%]', isUser ? 'flex-row-reverse' : 'flex-row')}>
-        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border', isUser ? 'bg-primary text-primary-foreground border-primary/50' : 'bg-card border-border/50')}>
-          {isUser ? <User className="h-5 w-5" /> : <Terminal className="h-5 w-5" />}
+    <div className={cn('flex w-full gap-3 py-3', isUser ? 'justify-end' : 'justify-start')}>
+      <div className={cn('flex gap-2 max-w-[90%] md:max-w-[80%]', isUser ? 'flex-row-reverse' : 'flex-row')}>
+        <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', isUser ? 'bg-primary text-primary-foreground border-primary/50' : 'bg-card border-border/50')}>
+          {isUser ? <User className="h-4 w-4" /> : <Terminal className="h-4 w-4" />}
         </div>
         
-        <div className="flex flex-col gap-2 min-w-0 max-w-full">
+        <div className="flex flex-col gap-1.5 min-w-0 max-w-full">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            {isUser ? 'You' : 'Assistant'}
+            {isUser ? 'You' : (message.model ? message.model.split('/').pop() : 'Assistant')}
             <span className="text-[10px] opacity-50">
               {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
@@ -56,7 +56,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 : 'bg-card/50 backdrop-blur-sm border-border/30'
             )}
           >
-            <div className="p-4">
+            <div className={isUser ? 'px-3 py-2' : 'p-4'}>
               {isUser ? (
                 <p className="whitespace-pre-wrap leading-relaxed text-sm">{message.content}</p>
               ) : (

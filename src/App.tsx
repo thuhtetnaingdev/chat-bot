@@ -30,6 +30,7 @@ function App() {
   const [showSidebar, setShowSidebar] = useState(false)
   const [models, setModels] = useState<Model[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
+  const [isThinking, setIsThinking] = useState(false)
   const modelsLoadedRef = useRef(false)
 
   const loadModels = useCallback(async () => {
@@ -61,6 +62,12 @@ function App() {
         </div>
       </div>
     )
+  }
+
+  const handleSendMessage = async (message: string) => {
+    setIsThinking(true)
+    await sendMessage(message)
+    setIsThinking(false)
   }
 
   return (
@@ -166,10 +173,12 @@ function App() {
 
         {/* Input Area */}
         <ChatInput
-          onSend={sendMessage}
+          onSend={handleSendMessage}
           onStop={stopStreaming}
           isStreaming={isStreaming}
           disabled={!settings.apiKey}
+          apiKey={settings.apiKey}
+          isThinking={isThinking} // Pass the isThinking state
         />
       </main>
 

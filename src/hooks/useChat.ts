@@ -60,7 +60,8 @@ export function useChat(settings: Settings) {
       id: crypto.randomUUID(),
       role: 'assistant',
       content: '',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      model: settings.selectedModel
     }
 
     setConversations(prev => prev.map(conv => {

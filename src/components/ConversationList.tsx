@@ -81,17 +81,17 @@ export function ConversationList({
               <MessageSquare className="h-4 w-4 shrink-0 mt-0.5 opacity-70 group-hover:opacity-100 transition-opacity" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate leading-relaxed">
-                  {conversation.title}
+                  {conversation.title.slice(0, 15)}{conversation.title.length > 15 ? '...' : ''}
                 </p>
-                {conversation.messages.length > 0 && (
-                  <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
-                    {conversation.messages[conversation.messages.length - 1].content.slice(0, 40)}...
-                  </p>
-                )}
               </div>
               
               {(hoveredId === conversation.id || currentConversationId === conversation.id) && (
-                <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className={cn(
+                  "flex gap-0.5 shrink-0",
+                  currentConversationId === conversation.id 
+                    ? "opacity-100" 
+                    : "opacity-0 transition-opacity group-hover:opacity-100"
+                )}>
                   <Button
                     variant="ghost"
                     size="icon-xs"

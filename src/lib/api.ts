@@ -2,6 +2,58 @@ import { type Model } from '@/types'
 
 const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
+const WHISPER_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe'
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+export const transcribeAudio = async (
+  audioBlob: Blob,
+  apiKey: string
+): Promise<string> => {
+  if (!apiKey) {
+    throw new Error('API key required for transcription')
+  }
+
+  try {
+    const audioBase64 = await blobToBase64(audioBlob)
+
+    const response = await fetch(WHISPER_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ audio_b64: audioBase64 })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Transcription failed with status ${response.status}: ${errorText}`)
+    }
+
+    const data = await response.json()
+    
+    // Handle array response format from Whisper API
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((item: { text?: string }) => item.text || '').join(' ').trim()
+    }
+    
+    // Handle object response format
+    return data.transcription || data.text || ''
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('Unknown transcription error')
+  }
+}
 
 export const fetchModels = async (): Promise<Model[]> => {
   try {

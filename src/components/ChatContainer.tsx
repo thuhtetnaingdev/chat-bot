@@ -10,18 +10,19 @@ interface ChatContainerProps {
 }
 
 export function ChatContainer({ conversation, isStreaming }: ChatContainerProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [conversation?.messages, isStreaming])
 
   if (!conversation || conversation.messages.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center space-y-4 max-w-md">
+      <div className="flex flex-1 items-center justify-center overflow-hidden">
+        <div className="text-center space-y-4 max-w-md px-4">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-border/50 bg-gradient-to-br from-primary/20 to-primary/5">
             <Bot className="h-8 w-8 text-primary" />
           </div>
@@ -51,12 +52,15 @@ export function ChatContainer({ conversation, isStreaming }: ChatContainerProps)
   }
 
   return (
-    <ScrollArea className="flex-1" ref={scrollRef}>
-      <div className="flex max-w-4xl flex-col gap-0 mx-auto">
-        {conversation.messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
-      </div>
-    </ScrollArea>
+    <div className="flex-1 overflow-hidden">
+      <ScrollArea className="h-full" ref={scrollAreaRef}>
+        <div className="flex max-w-4xl flex-col mx-auto px-4 py-4">
+          {conversation.messages.map((message) => (
+            <MessageBubble key={message.id} message={message} />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
+    </div>
   )
 }
