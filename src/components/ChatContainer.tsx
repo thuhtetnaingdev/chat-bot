@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from './MessageBubble'
 import { type Conversation } from '@/types'
-import { Bot, Sparkles } from 'lucide-react'
+import { Bot } from 'lucide-react'
 
 interface ChatContainerProps {
   conversation: Conversation | null
