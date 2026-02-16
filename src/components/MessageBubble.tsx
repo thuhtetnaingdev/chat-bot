@@ -2,7 +2,7 @@ import { type Message } from '@/types'
 import { useState, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronDown, ChevronRight, Brain, Terminal, User, Loader2, Volume2, VolumeX } from 'lucide-react'
+import { ChevronDown, ChevronRight, Brain, Terminal, User, Loader2, Volume2, VolumeX, ImageIcon, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -104,13 +104,24 @@ function stripMarkdown(text: string): string {
 }
 
 export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
-  const { thinking, response, isThinking } = parseThinkingContent(message.content)
+  const contentText = typeof message.content === 'string' ? message.content : ''
+  const { thinking, response, isThinking } = parseThinkingContent(contentText)
   // Auto-expand thinking while streaming, collapse when done
   const [showThinking, setShowThinking] = useState(() => isThinking)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isLoadingTTS, setIsLoadingTTS] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isUser = message.role === 'user'
+
+  // Download generated image
+  const handleDownloadImage = (imageData: string, index: number) => {
+    const link = document.createElement('a')
+    link.href = imageData
+    link.download = `generated-image-${index}-${Date.now()}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   const handleSpeak = async () => {
     if (!apiKey || !response) return
@@ -182,9 +193,79 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
           >
             <div className={isUser ? 'px-3 py-2' : 'p-4'}>
               {isUser ? (
-                <p className="whitespace-pre-wrap break-words leading-relaxed text-sm">{message.content}</p>
+                <div className="flex flex-col gap-2">
+                  {typeof message.content === 'string' && message.content && (
+                    <p className="whitespace-pre-wrap break-words leading-relaxed text-sm">{message.content}</p>
+                  )}
+                  {message.images && message.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {message.images.map((img, index) => (
+                        <img
+                          key={index}
+                          src={img}
+                          alt={`Uploaded ${index + 1}`}
+                          className="max-h-32 max-w-full rounded-lg border border-border/50 object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col gap-4">
+                  {/* Tool Status Badge */}
+                  {message.activeTool && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 w-fit">
+                      <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-medium text-primary">
+                        {message.activeTool === 'create_image' ? 'Create Image' : message.activeTool}
+                      </span>
+                      {message.toolStatus === 'pending' && (
+                        <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                      )}
+                      {message.toolStatus === 'error' && (
+                        <span className="text-xs text-destructive">Failed</span>
+                      )}
+                      {message.toolStatus === 'success' && (
+                        <span className="text-xs text-green-600 dark:text-green-400 ✓">Done</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Generated Images */}
+                  {message.generatedImages && message.generatedImages.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Generated Image</span>
+                        {message.toolStatus === 'pending' && (
+                          <Loader2 className="h-3 w-3 text-muted-foreground animate-spin" />
+                        )}
+                      </div>
+                      <div className="grid gap-3">
+                        {message.generatedImages.map((img, index) => (
+                          <div key={index} className="relative group rounded-lg border border-border/50 overflow-hidden bg-muted/30">
+                            <img
+                              src={img}
+                              alt={`Generated ${index + 1}`}
+                              className="w-full h-auto max-h-96 object-contain"
+                            />
+                            {message.toolStatus === 'success' && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleDownloadImage(img, index)}
+                                className="absolute bottom-2 right-2 h-8 px-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Download
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {thinking && (
                     <div className="space-y-2">
                       <Button

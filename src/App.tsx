@@ -64,9 +64,9 @@ function App() {
     )
   }
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, images?: string[], activeTool?: string) => {
     setIsThinking(true)
-    await sendMessage(message)
+    await sendMessage(message, images, activeTool)
     setIsThinking(false)
   }
 

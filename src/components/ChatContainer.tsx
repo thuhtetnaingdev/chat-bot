@@ -52,7 +52,8 @@ export function ChatContainer({ conversation, isStreaming, apiKey }: ChatContain
   }
 
   const lastMessage = conversation.messages[conversation.messages.length - 1]
-  const isLastMessageEmpty = lastMessage?.role === 'assistant' && !lastMessage?.content?.trim()
+  const lastMessageContent = typeof lastMessage?.content === 'string' ? lastMessage.content : ''
+  const isLastMessageEmpty = lastMessage?.role === 'assistant' && !lastMessageContent.trim()
   const showLoading = isStreaming && isLastMessageEmpty
 
   // Filter out the last empty message when showing loading

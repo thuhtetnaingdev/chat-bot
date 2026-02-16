@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { type Conversation, type Message, type Settings } from '@/types'
 import { loadConversations, saveConversations } from '@/lib/storage'
-import { chatWithLLM } from '@/lib/api'
+import { chatWithLLM, generateImage, type ChatMessage } from '@/lib/api'
 
 export function useChat(settings: Settings) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -42,7 +42,7 @@ export function useChat(settings: Settings) {
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
 
-  const sendMessage = useCallback(async (userMessage: string) => {
+  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string) => {
     let conversation = currentConversation
 
     if (!conversation) {
@@ -53,15 +53,19 @@ export function useChat(settings: Settings) {
       id: crypto.randomUUID(),
       role: 'user',
       content: userMessage,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      images: images
     }
 
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: '',
+      content: activeTool === 'create_image' ? 'Generating image...' : '',
       timestamp: Date.now(),
-      model: settings.selectedModel
+      model: settings.selectedModel,
+      activeTool: activeTool,
+      toolStatus: activeTool === 'create_image' ? 'pending' : undefined,
+      generatedImages: []
     }
 
     setConversations(prev => prev.map(conv => {
@@ -82,38 +86,68 @@ export function useChat(settings: Settings) {
     abortControllerRef.current = new AbortController()
 
     try {
-      const messages = [
-        ...(settings.instructions ? [{ role: 'system', content: settings.instructions }] : []),
-        ...conversation.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        {
-          role: 'user',
-          content: userMessage
+      // Handle image generation tool
+      if (activeTool === 'create_image') {
+        // Extract prompt by removing the @create_image mention
+        const prompt = userMessage.replace(/@create_image\s*/gi, '').trim()
+        
+        if (!prompt) {
+          throw new Error('Please provide a description for the image you want to generate.')
         }
-      ]
 
-      let accumulatedContent = ''
+        const generatedImage = await generateImage(prompt, settings.apiKey)
 
-      await chatWithLLM(
-        messages,
-        settings.apiKey,
-        settings.selectedModel,
-        (content) => {
-          accumulatedContent += content
-          setConversations(prev => prev.map(conv => {
-            if (conv.id === conversation!.id) {
-              const msgs = [...conv.messages]
-              const lastMsg = msgs[msgs.length - 1]
-              lastMsg.content = accumulatedContent
-              return { ...conv, messages: msgs }
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversation!.id) {
+            const msgs = [...conv.messages]
+            const lastMsg = msgs[msgs.length - 1]
+            lastMsg.content = `Generated image based on: "${prompt}"`
+            lastMsg.generatedImages = [generatedImage]
+            lastMsg.toolStatus = 'success'
+            return { ...conv, messages: msgs }
+          }
+          return conv
+        }))
+      } else {
+        // Normal LLM chat flow
+        // Only send text to LLM - images are for UI display only
+        // OCR text is already included in userMessage by ChatInput
+        const messages: ChatMessage[] = [
+          ...(settings.instructions ? [{ role: 'system', content: settings.instructions }] : []),
+          ...conversation.messages.map((msg): ChatMessage => {
+            // Only send text content, ignore images for API
+            return {
+              role: msg.role,
+              content: typeof msg.content === 'string' ? msg.content : ''
             }
-            return conv
-          }))
-        },
-        abortControllerRef.current.signal
-      )
+          }),
+          {
+            role: 'user',
+            content: userMessage
+          }
+        ]
+
+        let accumulatedContent = ''
+
+        await chatWithLLM(
+          messages,
+          settings.apiKey,
+          settings.selectedModel,
+          (content) => {
+            accumulatedContent += content
+            setConversations(prev => prev.map(conv => {
+              if (conv.id === conversation!.id) {
+                const msgs = [...conv.messages]
+                const lastMsg = msgs[msgs.length - 1]
+                lastMsg.content = accumulatedContent
+                return { ...conv, messages: msgs }
+              }
+              return conv
+            }))
+          },
+          abortControllerRef.current.signal
+        )
+      }
     } catch (error) {
       console.error('Chat error:', error)
       setConversations(prev => prev.map(conv => {
@@ -121,6 +155,7 @@ export function useChat(settings: Settings) {
           const messages = [...conv.messages]
           const lastMsg = messages[messages.length - 1]
           lastMsg.content = error instanceof Error ? error.message : 'Failed to get response'
+          lastMsg.toolStatus = 'error'
           return { ...conv, messages }
         }
         return conv

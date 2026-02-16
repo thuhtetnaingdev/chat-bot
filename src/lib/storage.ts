@@ -4,7 +4,15 @@ const CONVERSATIONS_KEY = 'chatbot_conversations'
 const SETTINGS_KEY = 'chatbot_settings'
 
 export const saveConversations = (conversations: Conversation[]): void => {
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations))
+  const conversationsToSave = conversations.map(conv => ({
+    ...conv,
+    messages: conv.messages.map(msg => ({
+      ...msg,
+      images: undefined,
+      generatedImages: undefined
+    }))
+  }))
+  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversationsToSave))
 }
 
 export const loadConversations = (): Conversation[] => {

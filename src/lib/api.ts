@@ -4,14 +4,82 @@ const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
 const WHISPER_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe'
 const KOKORO_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak'
+const IMAGE_GENERATION_URL = 'https://chutes-z-image-turbo.chutes.ai/generate'
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1])
+    reader.onloadend = () => resolve(reader.result as string)
     reader.onerror = reject
     reader.readAsDataURL(blob)
   })
+}
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+export const generateImage = async (
+  prompt: string,
+  apiKey: string
+): Promise<string> => {
+  if (!apiKey) {
+    throw new Error('API key required for image generation')
+  }
+
+  try {
+    const response = await fetch(IMAGE_GENERATION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Image generation failed with status ${response.status}: ${errorText}`)
+    }
+
+    const contentType = response.headers.get('content-type')
+    
+    // If response is an image, convert to base64
+    if (contentType && contentType.startsWith('image/')) {
+      const blob = await response.blob()
+      return await blobToBase64(blob)
+    }
+
+    // Otherwise, try to parse as JSON
+    const data = await response.json()
+
+    // Handle base64 response
+    if (data.image) {
+      return data.image
+    }
+
+    // Handle URL response (fallback)
+    if (data.url) {
+      return data.url
+    }
+
+    // Handle array of images
+    if (Array.isArray(data.images) && data.images.length > 0) {
+      return data.images[0]
+    }
+
+    throw new Error('No image data in response')
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('Unknown image generation error')
+  }
 }
 
 export const transcribeAudio = async (
@@ -88,6 +156,102 @@ export const textToSpeech = async (
   }
 }
 
+export const performOCR = async (
+  imageBase64: string,
+  apiKey: string,
+  onChunk: (content: string) => void,
+  signal?: AbortSignal
+): Promise<string> => {
+  if (!apiKey) {
+    throw new Error('API key required for OCR')
+  }
+
+  const requestBody = {
+    model: 'rednote-hilab/dots.ocr',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'Extract and transcribe all text from this image. Provide the full text content as it appears.'
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: imageBase64
+            }
+          }
+        ]
+      }
+    ],
+    stream: true,
+    max_tokens: 2048,
+    temperature: 0.1
+  }
+
+  try {
+    const response = await fetch(LLM_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+      signal
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`OCR request failed with status ${response.status}: ${errorText}`)
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Response body is not readable')
+    }
+
+    const decoder = new TextDecoder()
+    let fullContent = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      const chunk = decoder.decode(value)
+      const lines = chunk.split('\n').filter(line => line.trim() !== '')
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6)
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data)
+            const content = parsed.choices?.[0]?.delta?.content || ''
+            if (content) {
+              fullContent += content
+              onChunk(content)
+            }
+          } catch {
+            // Ignore JSON parse errors for malformed chunks
+          }
+        }
+      }
+    }
+
+    return fullContent
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('OCR request was cancelled')
+    }
+    throw error
+  }
+}
+
+export const processImageFile = async (file: File): Promise<string> => {
+  return await fileToBase64(file)
+}
+
 export const fetchModels = async (): Promise<Model[]> => {
   try {
 
@@ -148,8 +312,19 @@ export const fetchModels = async (): Promise<Model[]> => {
   }
 }
 
+export interface MessageContent {
+  type: 'text' | 'image_url'
+  text?: string
+  image_url?: { url: string }
+}
+
+export interface ChatMessage {
+  role: string
+  content: string | MessageContent[]
+}
+
 export const chatWithLLM = async (
-  messages: Array<{ role: string; content: string }>,
+  messages: ChatMessage[],
   apiKey: string,
   model = 'unsloth/gemma-3-27b-it',
   onChunk: (content: string) => void,
