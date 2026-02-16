@@ -3,6 +3,7 @@ import { type Model } from '@/types'
 const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
 const WHISPER_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe'
+const KOKORO_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak'
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -39,12 +40,12 @@ export const transcribeAudio = async (
     }
 
     const data = await response.json()
-    
+
     // Handle array response format from Whisper API
     if (Array.isArray(data) && data.length > 0) {
       return data.map((item: { text?: string }) => item.text || '').join(' ').trim()
     }
-    
+
     // Handle object response format
     return data.transcription || data.text || ''
   } catch (error) {
@@ -52,6 +53,38 @@ export const transcribeAudio = async (
       throw error
     }
     throw new Error('Unknown transcription error')
+  }
+}
+
+export const textToSpeech = async (
+  text: string,
+  apiKey: string
+): Promise<Blob> => {
+  if (!apiKey) {
+    throw new Error('API key required for text-to-speech')
+  }
+
+  try {
+    const response = await fetch(KOKORO_TTS_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Text-to-speech failed with status ${response.status}: ${errorText}`)
+    }
+
+    return await response.blob()
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('Unknown text-to-speech error')
   }
 }
 
@@ -157,6 +190,7 @@ export const chatWithLLM = async (
 
     const decoder = new TextDecoder()
     let fullContent = ''
+    let inThinkMode = false
 
     while (true) {
       const { done, value } = await reader.read()
@@ -171,8 +205,31 @@ export const chatWithLLM = async (
           if (data === '[DONE]') continue
           try {
             const parsed = JSON.parse(data)
-            const content = parsed.choices?.[0]?.delta?.content || ''
+            const delta = parsed.choices?.[0]?.delta
+            // DeepSeek R1 returns thinking content in reasoning_content field
+            const reasoningContent = delta?.reasoning_content || ''
+            const content = delta?.content || ''
+            
+            // Handle reasoning content (thinking)
+            if (reasoningContent) {
+              // Start think block if not already started
+              if (!inThinkMode) {
+                fullContent += '<think>'
+                onChunk('<think>')
+                inThinkMode = true
+              }
+              fullContent += reasoningContent
+              onChunk(reasoningContent)
+            }
+            
+            // Handle regular content
             if (content) {
+              // Close think block if we're transitioning from reasoning to content
+              if (inThinkMode) {
+                fullContent += '</think>'
+                onChunk('</think>')
+                inThinkMode = false
+              }
               fullContent += content
               onChunk(content)
             }

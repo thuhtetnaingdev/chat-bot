@@ -7,9 +7,10 @@ import { Bot } from 'lucide-react'
 interface ChatContainerProps {
   conversation: Conversation | null
   isStreaming: boolean
+  apiKey?: string
 }
 
-export function ChatContainer({ conversation, isStreaming }: ChatContainerProps) {
+export function ChatContainer({ conversation, isStreaming, apiKey }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
@@ -50,13 +51,46 @@ export function ChatContainer({ conversation, isStreaming }: ChatContainerProps)
     )
   }
 
+  const lastMessage = conversation.messages[conversation.messages.length - 1]
+  const isLastMessageEmpty = lastMessage?.role === 'assistant' && !lastMessage?.content?.trim()
+  const showLoading = isStreaming && isLastMessageEmpty
+
+  // Filter out the last empty message when showing loading
+  const messagesToShow = showLoading 
+    ? conversation.messages.slice(0, -1) 
+    : conversation.messages
+
   return (
     <div className="flex-1 overflow-hidden">
       <ScrollArea className="h-full" ref={scrollAreaRef}>
         <div className="flex max-w-4xl flex-col mx-auto px-4 py-4">
-          {conversation.messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+          {messagesToShow.map((message) => (
+            <MessageBubble key={message.id} message={message} apiKey={apiKey} />
           ))}
+          {showLoading && (
+            <div className="flex w-full gap-3 py-3 justify-start">
+              <div className="flex gap-2 max-w-[90%] md:max-w-[80%] flex-row">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-card border-border/50">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col gap-1.5 min-w-0 max-w-full overflow-hidden">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    {lastMessage?.model ? lastMessage.model.split('/').pop() : 'Assistant'}
+                    <span className="text-[10px] opacity-50">
+                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>

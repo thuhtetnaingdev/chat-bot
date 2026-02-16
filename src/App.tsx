@@ -169,6 +169,7 @@ function App() {
         <ChatContainer
           conversation={currentConversation || null}
           isStreaming={isStreaming}
+          apiKey={settings.apiKey}
         />
 
         {/* Input Area */}
