@@ -307,12 +307,12 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
 
   return (
     <div className="border-t border-border/50 bg-card/30">
-      <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
         <form onSubmit={handleSubmit}>
           {/* Error Message */}
           {(transcriptionError || recordingError) && (
-            <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
-              <p className="text-xs text-destructive">
+            <div className="mb-2 sm:mb-3 flex items-center justify-between px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-[10px] sm:text-xs text-destructive line-clamp-2">
                 {transcriptionError || recordingError}
               </p>
               <Button
@@ -320,7 +320,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
                 variant="ghost"
                 size="sm"
                 onClick={handleClearError}
-                className="h-7 text-xs hover:bg-destructive/20"
+                className="h-6 sm:h-7 text-[10px] sm:text-xs hover:bg-destructive/20 shrink-0"
               >
                 Dismiss
               </Button>
@@ -329,20 +329,20 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
 
           {/* Selected Images Preview */}
           {selectedImages.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className="mb-2 sm:mb-3 flex flex-wrap gap-1.5 sm:gap-2">
               {selectedImages.map((img, index) => (
                 <div key={index} className="relative group">
                   <img
                     src={img}
                     alt={`Selected ${index + 1}`}
-                    className="h-16 w-16 object-cover rounded-lg border border-border/50"
+                    className="h-12 w-12 sm:h-16 sm:w-16 object-cover rounded-lg border border-border/50"
                   />
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(index)}
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   </button>
                 </div>
               ))}
@@ -352,14 +352,14 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
           {/* Model Selector for Image Generation */}
           {activeTool === 'create_image' && (
             <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-xs font-medium text-muted-foreground">Image Model:</span>
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Image Model:</span>
               <Select value={selectedImageModel} onValueChange={onImageModelChange}>
-                <SelectTrigger className="w-[200px] h-8 text-xs">
+                <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {IMAGE_MODELS.map((model) => (
-                    <SelectItem key={model.id} value={model.id} className="text-xs">
+                    <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
                       {model.name}
                     </SelectItem>
                   ))}
@@ -368,161 +368,164 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
             </div>
           )}
 
-          {/* Main Input Row */}
-          <div className="flex items-end gap-2">
-            {/* File Upload Button */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              accept="image/*"
-              multiple
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleFileButtonClick}
-              disabled={disabled || isStreaming || isRecording || isTranscribing || !apiKey}
-              className="h-[64px] w-[64px] shrink-0 rounded-lg border border-border/50 hover:bg-accent/50 disabled:opacity-50"
-            >
-              <Paperclip className="h-5 w-5" />
-            </Button>
+          {/* Main Input Area - Mobile: stacked, Desktop: side by side */}
+          <div className="flex flex-col gap-2">
+            {/* Text Input Row */}
+            <div className="flex items-end gap-1.5 sm:gap-2">
+              {/* File Upload Button */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                multiple
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleFileButtonClick}
+                disabled={disabled || isStreaming || isRecording || isTranscribing || !apiKey}
+                className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-border/50 hover:bg-accent/50 disabled:opacity-50"
+              >
+                <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
 
-            {/* Voice Button */}
-            <VoiceInputButton
-              isRecording={isRecording}
-              isTranscribing={isTranscribing}
-              onStartRecording={handleStartRecording}
-              onStopRecording={handleStopRecording}
-              disabled={disabled || isStreaming}
-              recordingDuration={recordingDuration}
-            />
+              {/* Voice Button */}
+              <VoiceInputButton
+                isRecording={isRecording}
+                isTranscribing={isTranscribing}
+                onStartRecording={handleStartRecording}
+                onStopRecording={handleStopRecording}
+                disabled={disabled || isStreaming}
+                recordingDuration={recordingDuration}
+              />
 
-            {/* Text Input */}
-            <div className="flex-1 min-w-0 relative">
-              <div className="relative border border-border/50 rounded-lg bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-colors">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  onClick={handleTextareaClick}
-                  placeholder={isRecording ? 'Recording...' : isProcessingOCR ? 'Extracting text from images...' : selectedImages.length > 0 ? `${selectedImages.length} image(s) attached` : 'Type your message...'}
-                  disabled={isInputDisabled}
-                  className="min-h-[64px] max-h-[200px] resize-none border-0 bg-transparent px-4 py-3.5 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
-                  rows={2}
-                />
-                {input.length > 0 && (
-                  <div className="absolute bottom-2 right-3 text-[10px] text-muted-foreground/60">
-                    {input.length}
+              {/* Text Input */}
+              <div className="flex-1 min-w-0 relative">
+                <div className="relative border border-border/50 rounded-lg bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-colors">
+                  <Textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    onClick={handleTextareaClick}
+                    placeholder={isRecording ? 'Recording...' : isProcessingOCR ? 'Extracting text...' : selectedImages.length > 0 ? `${selectedImages.length} image(s)` : 'Type message...'}
+                    disabled={isInputDisabled}
+                    className="min-h-[48px] sm:min-h-[64px] max-h-[120px] sm:max-h-[200px] resize-none border-0 bg-transparent px-3 sm:px-4 py-2.5 sm:py-3.5 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
+                    rows={2}
+                  />
+                  {input.length > 0 && (
+                    <div className="absolute bottom-1.5 right-2 sm:bottom-2 sm:right-3 text-[9px] sm:text-[10px] text-muted-foreground/60">
+                      {input.length}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tool Suggestions Popup - Mobile optimized */}
+                {showToolSuggestions && filteredTools.length > 0 && (
+                  <div className="absolute bottom-full left-0 right-0 sm:left-0 sm:right-auto mb-2 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
+                    <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Tools</p>
+                    </div>
+                    <div className="max-h-36 sm:max-h-48 overflow-y-auto">
+                      {filteredTools.map((tool, index) => (
+                        <button
+                          key={tool.id}
+                          type="button"
+                          onClick={() => insertToolMention(tool)}
+                          className={`w-full px-2 sm:px-3 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-3 text-left transition-colors hover:bg-accent ${
+                            index === selectedToolIndex ? 'bg-accent' : ''
+                          }`}
+                        >
+                          <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-medium truncate">{tool.name}</p>
+                            <p className="text-[9px] sm:text-xs text-muted-foreground truncate">{tool.description}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/30 border-t border-border flex items-center justify-between">
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground">
+                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">↑↓</kbd> to navigate
+                      </p>
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground">
+                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">Enter</kbd> to select
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Tool Suggestions Popup */}
-              {showToolSuggestions && filteredTools.length > 0 && (
-                <div className="absolute bottom-full left-0 mb-2 w-72 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
-                  <div className="px-3 py-2 bg-muted/50 border-b border-border">
-                    <p className="text-xs text-muted-foreground font-medium">Tools</p>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredTools.map((tool, index) => (
-                      <button
-                        key={tool.id}
-                        type="button"
-                        onClick={() => insertToolMention(tool)}
-                        className={`w-full px-3 py-2.5 flex items-center gap-3 text-left transition-colors hover:bg-accent ${
-                          index === selectedToolIndex ? 'bg-accent' : ''
-                        }`}
-                      >
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <ImageIcon className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{tool.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{tool.description}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="px-3 py-2 bg-muted/30 border-t border-border flex items-center justify-between">
-                    <p className="text-[10px] text-muted-foreground">
-                      <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">↑↓</kbd> to navigate
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">Enter</kbd> to select
-                    </p>
-                  </div>
+              {/* Send Button */}
+              {!isStreaming ? (
+                <Button
+                  type="submit"
+                  disabled={disabled || (!input.trim() && selectedImages.length === 0) || isRecording || isTranscribing || isProcessingOCR}
+                  className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-primary/50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
+                >
+                  <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={onStop}
+                  variant="destructive"
+                  disabled={isRecording || isTranscribing}
+                  className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-destructive/50 bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
+                >
+                  <Square className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+              )}
+            </div>
+
+            {/* Audio Visualizer - Full width on mobile */}
+            {isRecording && audioData && (
+              <div className="h-8 sm:h-10 rounded-lg bg-muted/30 border border-border/30 overflow-hidden">
+                <AudioVisualizer
+                  audioData={audioData}
+                  isActive={isRecording}
+                  barCount={24}
+                />
+              </div>
+            )}
+
+            {/* Helper Text - Stacked on mobile, horizontal on desktop */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-[9px] sm:text-[10px] text-muted-foreground px-0.5">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                <span className="whitespace-nowrap"><kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">Enter</kbd> to send</span>
+                <span className="text-muted-foreground/30 hidden sm:inline">|</span>
+                <span className="whitespace-nowrap"><kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">Shift+Enter</kbd> new line</span>
+                {isRecording && (
+                  <>
+                    <span className="text-muted-foreground/30 hidden sm:inline">|</span>
+                    <span className="text-destructive font-medium whitespace-nowrap">Recording...</span>
+                  </>
+                )}
+                {isTranscribing && (
+                  <>
+                    <span className="text-muted-foreground/30 hidden sm:inline">|</span>
+                    <span className="text-primary font-medium whitespace-nowrap">Transcribing...</span>
+                  </>
+                )}
+                {isProcessingOCR && (
+                  <>
+                    <span className="text-muted-foreground/30 hidden sm:inline">|</span>
+                    <span className="text-primary font-medium whitespace-nowrap">Processing OCR...</span>
+                  </>
+                )}
+              </div>
+              {disabled && !isRecording && !isTranscribing && !isProcessingOCR && (
+                <div className="flex items-center gap-1.5 sm:justify-end">
+                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                  <span>API key required</span>
                 </div>
               )}
             </div>
-
-            {/* Send Button */}
-            {!isStreaming ? (
-              <Button
-                type="submit"
-                disabled={disabled || (!input.trim() && selectedImages.length === 0) || isRecording || isTranscribing || isProcessingOCR}
-                className="h-[64px] w-[64px] shrink-0 rounded-lg border border-primary/50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
-              >
-                <ArrowUp className="h-5 w-5" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={onStop}
-                variant="destructive"
-                disabled={isRecording || isTranscribing}
-                className="h-[64px] w-[64px] shrink-0 rounded-lg border border-destructive/50 bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
-              >
-                <Square className="h-5 w-5" />
-              </Button>
-            )}
-          </div>
-
-          {/* Audio Visualizer */}
-          {isRecording && audioData && (
-            <div className="mt-3 h-10 rounded-lg bg-muted/30 border border-border/30 overflow-hidden">
-              <AudioVisualizer
-                audioData={audioData}
-                isActive={isRecording}
-                barCount={32}
-              />
-            </div>
-          )}
-
-          {/* Helper Text */}
-          <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span>Press <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/50 font-mono">Enter</kbd> to send</span>
-              <span className="text-muted-foreground/30">|</span>
-              <span><kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/50 font-mono">Shift + Enter</kbd> for new line</span>
-              {isRecording && (
-                <>
-                  <span className="text-muted-foreground/30">|</span>
-                  <span className="text-destructive font-medium">Recording...</span>
-                </>
-              )}
-              {isTranscribing && (
-                <>
-                  <span className="text-muted-foreground/30">|</span>
-                  <span className="text-primary font-medium">Transcribing...</span>
-                </>
-              )}
-              {isProcessingOCR && (
-                <>
-                  <span className="text-muted-foreground/30">|</span>
-                  <span className="text-primary font-medium">Processing OCR...</span>
-                </>
-              )}
-            </div>
-            {disabled && !isRecording && !isTranscribing && !isProcessingOCR && (
-              <div className="flex items-center gap-1.5">
-                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
-                <span>API key required</span>
-              </div>
-            )}
           </div>
         </form>
       </div>

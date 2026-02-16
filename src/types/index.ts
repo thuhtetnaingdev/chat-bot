@@ -68,4 +68,5 @@ export interface Model {
   id: string
   name: string
   cost: number
+  max_tokens?: number
 }

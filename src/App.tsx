@@ -13,6 +13,12 @@ import { cn } from '@/lib/utils'
 
 function App() {
   const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings()
+  
+  const [showSettings, setShowSettings] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
+  const [models, setModels] = useState<Model[]>([])
+  const [isLoadingModels, setIsLoadingModels] = useState(false)
+
   const {
     conversations,
     currentConversation,
@@ -24,12 +30,7 @@ function App() {
     renameConversation,
     stopStreaming,
     selectConversation
-  } = useChat(settings)
-
-  const [showSettings, setShowSettings] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(false)
-  const [models, setModels] = useState<Model[]>([])
-  const [isLoadingModels, setIsLoadingModels] = useState(false)
+  } = useChat(settings, models)
   const [isThinking, setIsThinking] = useState(false)
   const modelsLoadedRef = useRef(false)
 

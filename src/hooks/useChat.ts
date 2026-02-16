@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { type Conversation, type Message, type Settings } from '@/types'
+import { type Conversation, type Message, type Settings, type Model } from '@/types'
 import { loadConversations, saveConversations } from '@/lib/storage'
 import { chatWithLLM, generateImage, type ChatMessage } from '@/lib/api'
 
-export function useChat(settings: Settings) {
+export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
@@ -129,6 +129,10 @@ export function useChat(settings: Settings) {
 
         let accumulatedContent = ''
 
+        // Get max_tokens for the selected model
+        const selectedModel = models.find(m => m.id === settings.selectedModel)
+        const max_tokens = selectedModel?.max_tokens
+
         await chatWithLLM(
           messages,
           settings.apiKey,
@@ -145,7 +149,8 @@ export function useChat(settings: Settings) {
               return conv
             }))
           },
-          abortControllerRef.current.signal
+          abortControllerRef.current.signal,
+          max_tokens
         )
       }
     } catch (error) {
@@ -164,7 +169,7 @@ export function useChat(settings: Settings) {
       setIsStreaming(false)
       abortControllerRef.current = null
     }
-  }, [currentConversation, settings, createNewConversation])
+  }, [currentConversation, settings, createNewConversation, models])
 
   const deleteConversation = useCallback((id: string) => {
     setConversations(prev => prev.filter(c => c.id !== id))

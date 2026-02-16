@@ -33,7 +33,7 @@ export function VoiceInputButton({
         onClick={isRecording ? onStopRecording : onStartRecording}
         disabled={disabled || isTranscribing}
         className={cn(
-          'h-[64px] w-[64px] shrink-0 border shadow-xs transition-all rounded-lg',
+          'h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 border shadow-xs transition-all rounded-lg',
           isRecording
             ? 'border-destructive/50 bg-destructive text-destructive-foreground hover:bg-destructive/90 animate-pulse'
             : 'border-border/50 bg-card text-foreground hover:bg-accent/50 hover:border-border',
@@ -41,16 +41,16 @@ export function VoiceInputButton({
         )}
       >
         {isTranscribing ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
         ) : isRecording ? (
-          <MicOff className="h-5 w-5" />
+          <MicOff className="h-4 w-4 sm:h-5 sm:w-5" />
         ) : (
-          <Mic className="h-5 w-5" />
+          <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
         )}
       </Button>
 
       {isRecording && (
-        <div className="absolute -top-9 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded bg-muted border border-border/50 text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+        <div className="absolute -top-8 sm:-top-9 left-1/2 -translate-x-1/2 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-muted border border-border/50 text-[9px] sm:text-[10px] font-mono text-muted-foreground whitespace-nowrap">
           {formatDuration(recordingDuration)}
         </div>
       )}
