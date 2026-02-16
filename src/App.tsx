@@ -179,7 +179,9 @@ function App() {
           isStreaming={isStreaming}
           disabled={!settings.apiKey}
           apiKey={settings.apiKey}
-          isThinking={isThinking} // Pass the isThinking state
+          isThinking={isThinking}
+          selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
+          onImageModelChange={(value) => updateSettings({ selectedImageModel: value })}
         />
       </main>
 

@@ -50,10 +50,18 @@ export interface Conversation {
   updatedAt: number
 }
 
+export const IMAGE_MODELS = [
+  { id: 'z-image-turbo', name: 'Z Image Turbo', url: 'https://chutes-z-image-turbo.chutes.ai/generate' },
+  { id: 'Qwen-Image-2512', name: 'Qwen Image 2512', url: 'https://chutes-qwen-image-2512.chutes.ai/generate' },
+  { id: 'chroma', name: 'Chroma', url: 'https://chutes-chroma.chutes.ai/generate' },
+  { id: 'hunyuan-image-3', name: 'Hunyuan Image 3', url: 'https://chutes-hunyuan-image-3.chutes.ai/generate' }
+] as const
+
 export interface Settings {
   apiKey: string
   instructions: string
   selectedModel: string
+  selectedImageModel: string
 }
 
 export interface Model {

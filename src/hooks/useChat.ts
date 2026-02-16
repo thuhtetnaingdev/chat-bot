@@ -95,7 +95,7 @@ export function useChat(settings: Settings) {
           throw new Error('Please provide a description for the image you want to generate.')
         }
 
-        const generatedImage = await generateImage(prompt, settings.apiKey)
+        const generatedImage = await generateImage(prompt, settings.apiKey, settings.selectedImageModel)
 
         setConversations(prev => prev.map(conv => {
           if (conv.id === conversation!.id) {

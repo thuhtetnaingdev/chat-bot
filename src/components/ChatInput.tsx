@@ -1,13 +1,14 @@
 import { useState, type KeyboardEvent, type FormEvent, useRef, useEffect, type ChangeEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Square, ArrowUp, Paperclip, X, ImageIcon } from 'lucide-react'
 import { useAudioRecorder } from '@/hooks/useAudioRecorder'
 import { useAudioVisualizer } from '@/hooks/useAudioVisualizer'
 import { AudioVisualizer } from '@/components/AudioVisualizer'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
-import { availableTools, type Tool } from '@/types'
+import { availableTools, type Tool, IMAGE_MODELS } from '@/types'
 
 export interface ChatInputProps {
   onSend: (message: string, images?: string[], activeTool?: string) => Promise<void>
@@ -16,9 +17,11 @@ export interface ChatInputProps {
   disabled?: boolean
   apiKey?: string
   isThinking: boolean
+  selectedImageModel?: string
+  onImageModelChange?: (model: string) => void
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '' }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', selectedImageModel = 'z-image-turbo', onImageModelChange }: ChatInputProps) {
   const [input, setInput] = useState('')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null)
@@ -298,6 +301,8 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '' }
     return undefined
   }
 
+  const activeTool = getActiveTool()
+
   const isInputDisabled = disabled || isStreaming || isTranscribing || isRecording || isProcessingOCR
 
   return (
@@ -341,6 +346,25 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '' }
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Model Selector for Image Generation */}
+          {activeTool === 'create_image' && (
+            <div className="mb-2 flex items-center gap-2 px-1">
+              <span className="text-xs font-medium text-muted-foreground">Image Model:</span>
+              <Select value={selectedImageModel} onValueChange={onImageModelChange}>
+                <SelectTrigger className="w-[200px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {IMAGE_MODELS.map((model) => (
+                    <SelectItem key={model.id} value={model.id} className="text-xs">
+                      {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

@@ -1,10 +1,14 @@
-import { type Model } from '@/types'
+import { type Model, IMAGE_MODELS } from '@/types'
 
 const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
 const WHISPER_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe'
 const KOKORO_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak'
-const IMAGE_GENERATION_URL = 'https://chutes-z-image-turbo.chutes.ai/generate'
+
+const getImageGenerationUrl = (modelId: string): string => {
+  const model = IMAGE_MODELS.find(m => m.id === modelId)
+  return model?.url || 'https://chutes-z-image-turbo.chutes.ai/generate'
+}
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -26,14 +30,15 @@ const fileToBase64 = (file: File): Promise<string> => {
 
 export const generateImage = async (
   prompt: string,
-  apiKey: string
+  apiKey: string,
+  imageModel = 'z-image-turbo'
 ): Promise<string> => {
   if (!apiKey) {
     throw new Error('API key required for image generation')
   }
 
   try {
-    const response = await fetch(IMAGE_GENERATION_URL, {
+    const response = await fetch(getImageGenerationUrl(imageModel), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
