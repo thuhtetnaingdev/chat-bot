@@ -108,62 +108,64 @@ function App() {
       {/* Main Content */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-border/50 bg-card/30 backdrop-blur-sm px-4 py-3">
-          <div className="flex items-center gap-3 flex-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden shrink-0 hover:bg-accent/50"
-              onClick={() => setShowSidebar(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <h1 className={cn('truncate font-semibold tracking-tight', 'text-base md:text-lg')}>
-              {currentConversation?.title || 'New Chat'}
-            </h1>
-          </div>
-          
-           {isLoadingModels ? (
-             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-               Loading...
-             </div>
-           ) : models.length > 0 ? (
-             <Select
-               value={settings.selectedModel}
-               onValueChange={(value) => updateSettings({ selectedModel: value })}
-             >
-               <SelectTrigger className="w-[180px] md:w-[260px] text-xs">
-                 <SelectValue placeholder="Select model" />
-               </SelectTrigger>
-               <SelectContent>
-                 {models.map((model) => (
-                   <SelectItem key={model.id} value={model.id}>
-                     <div className="flex flex-col">
-                       <span className="font-medium text-xs">{model.name}</span>
-                       {model.cost !== undefined && (
-                         <span className="text-[10px] text-muted-foreground">
-                           ${model.cost}/1M tokens
-                         </span>
-                       )}
-                     </div>
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-           ) : (
-             <div className="text-[10px] text-muted-foreground">
-               {settings.apiKey ? 'No models available' : 'Set API key to load models'}
-             </div>
-           )}
-
+        <header className="flex items-center gap-2 sm:gap-3 border-b border-border/50 bg-card/30 backdrop-blur-sm px-3 sm:px-4 py-2 sm:py-3">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setShowSettings(true)}
+            className="md:hidden shrink-0 hover:bg-accent/50 h-9 w-9"
+            onClick={() => setShowSidebar(true)}
           >
-            <Settings className="h-5 w-5" />
+            <Menu className="h-5 w-5" />
           </Button>
+          
+          <h1 className={cn('truncate font-semibold tracking-tight flex-1 min-w-0', 'text-sm sm:text-base md:text-lg')}>
+            {currentConversation?.title || 'New Chat'}
+          </h1>
+          
+          <div className="flex items-center gap-2 shrink-0">
+            {isLoadingModels ? (
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
+                <span className="hidden sm:inline">Loading...</span>
+              </div>
+            ) : models.length > 0 ? (
+              <Select
+                value={settings.selectedModel}
+                onValueChange={(value) => updateSettings({ selectedModel: value })}
+              >
+                <SelectTrigger className="w-[120px] sm:w-[160px] md:w-[200px] lg:w-[260px] h-8 sm:h-9 text-[10px] sm:text-xs">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-xs">{model.name}</span>
+                        {model.cost !== undefined && (
+                          <span className="text-[10px] text-muted-foreground">
+                            ${model.cost}/1M tokens
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="text-[9px] sm:text-[10px] text-muted-foreground hidden sm:block">
+                {settings.apiKey ? 'No models available' : 'Set API key to load models'}
+              </div>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowSettings(true)}
+              className="h-9 w-9 shrink-0"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
 
         {/* Chat Area */}

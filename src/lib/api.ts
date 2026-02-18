@@ -120,10 +120,15 @@ export const generateImage = async (
 
     const contentType = response.headers.get('content-type')
     
-    // If response is an image, convert to base64
+    // If response is an image, convert to base64 data URL
     if (contentType && contentType.startsWith('image/')) {
       const blob = await response.blob()
-      return await blobToBase64(blob)
+      const reader = new FileReader()
+      return new Promise((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
     }
 
     // Otherwise, try to parse as JSON
