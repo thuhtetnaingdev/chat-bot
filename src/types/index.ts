@@ -32,6 +32,13 @@ export const availableTools: Tool[] = [
     description: 'Analyze images and videos using vision-capable models',
     icon: 'eye',
     pattern: '@vision'
+  },
+  {
+    id: 'edit_image',
+    name: 'Edit Image',
+    description: 'Edit existing images using AI based on text prompts',
+    icon: 'wand-2',
+    pattern: '@edit_image'
   }
 ]
 

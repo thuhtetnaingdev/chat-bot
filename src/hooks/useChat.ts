@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { type Conversation, type Message, type Settings, type Model } from '@/types'
 import { loadConversations, saveConversations } from '@/lib/storage'
-import { chatWithLLM, generateImage, type ChatMessage } from '@/lib/api'
+import { chatWithLLM, generateImage, editImage, type ChatMessage } from '@/lib/api'
 
 export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -60,11 +60,11 @@ export function useChat(settings: Settings, models: Model[] = []) {
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: activeTool === 'create_image' ? 'Generating image...' : '',
+      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : '',
       timestamp: Date.now(),
       model: activeTool === 'vision' ? (visionModel || settings.selectedModel) : settings.selectedModel,
       activeTool: activeTool,
-      toolStatus: activeTool === 'create_image' || activeTool === 'vision' ? 'pending' : undefined,
+      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' ? 'pending' : undefined,
       generatedImages: []
     }
 
@@ -168,6 +168,31 @@ export function useChat(settings: Settings, models: Model[] = []) {
           if (conv.id === conversation!.id) {
             const msgs = [...conv.messages]
             const lastMsg = msgs[msgs.length - 1]
+            lastMsg.toolStatus = 'success'
+            return { ...conv, messages: msgs }
+          }
+          return conv
+        }))
+      } else if (activeTool === 'edit_image') {
+        // Extract prompt by removing the @edit_image mention
+        const prompt = userMessage.replace(/@edit_image\s*/gi, '').trim()
+        
+        if (!prompt) {
+          throw new Error('Please provide a description for how to edit the image.')
+        }
+
+        if (!images || images.length === 0) {
+          throw new Error('Please upload at least one image to edit.')
+        }
+
+        const editedImage = await editImage(prompt, images, settings.apiKey)
+
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversation!.id) {
+            const msgs = [...conv.messages]
+            const lastMsg = msgs[msgs.length - 1]
+            lastMsg.content = `Edited image based on: "${prompt}"`
+            lastMsg.generatedImages = [editedImage]
             lastMsg.toolStatus = 'success'
             return { ...conv, messages: msgs }
           }

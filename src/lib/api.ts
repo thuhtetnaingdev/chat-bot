@@ -158,6 +158,83 @@ export const generateImage = async (
   }
 }
 
+export const editImage = async (
+  prompt: string,
+  images: string[],
+  apiKey: string
+): Promise<string> => {
+  if (!apiKey) {
+    throw new Error('API key required for image editing')
+  }
+
+  if (!images || images.length === 0) {
+    throw new Error('Please upload at least one image to edit')
+  }
+
+  try {
+    // Strip data URL prefix from images (e.g., "data:image/png;base64," -> "")
+    const cleanImages = images.map(img => {
+      const commaIndex = img.indexOf(',')
+      return commaIndex !== -1 ? img.slice(commaIndex + 1) : img
+    })
+
+    const response = await fetch('https://chutes-qwen-image-edit-2509.chutes.ai/generate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt,
+        image_b64s: cleanImages
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Image editing failed with status ${response.status}: ${errorText}`)
+    }
+
+    const contentType = response.headers.get('content-type')
+    
+    // If response is an image, convert to base64 data URL
+    if (contentType && contentType.startsWith('image/')) {
+      const blob = await response.blob()
+      const reader = new FileReader()
+      return new Promise((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    }
+
+    // Otherwise, try to parse as JSON
+    const data = await response.json()
+
+    // Handle base64 response
+    if (data.image) {
+      return data.image
+    }
+
+    // Handle URL response (fallback)
+    if (data.url) {
+      return data.url
+    }
+
+    // Handle array of images
+    if (Array.isArray(data.images) && data.images.length > 0) {
+      return data.images[0]
+    }
+
+    throw new Error('No image data in response')
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('Unknown image editing error')
+  }
+}
+
 export const transcribeAudio = async (
   audioBlob: Blob,
   apiKey: string

@@ -118,13 +118,26 @@ export function ChatInput({
           setTranscriptionError('Please upload at least one image for vision analysis')
           return
         }
-        
+
         await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel)
         setInput('')
         setSelectedImages([])
         return
       }
-      
+
+      // If using @edit_image tool, don't do OCR - send images for editing
+      if (activeTool === 'edit_image') {
+        if (selectedImages.length === 0) {
+          setTranscriptionError('Please upload at least one image to edit')
+          return
+        }
+
+        await onSend(input.trim(), selectedImages, activeTool)
+        setInput('')
+        setSelectedImages([])
+        return
+      }
+
       // If there are images, process OCR in background first (for non-vision tools)
       if (selectedImages.length > 0 && apiKey) {
         setIsProcessingOCR(true)
