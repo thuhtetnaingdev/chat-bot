@@ -178,7 +178,7 @@ export const editImage = async (
       return commaIndex !== -1 ? img.slice(commaIndex + 1) : img
     })
 
-    const response = await fetch('https://chutes-qwen-image-edit-2509.chutes.ai/generate', {
+    const response = await fetch('https://chutes-qwen-image-edit-2511.chutes.ai/generate', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
