@@ -110,3 +110,5 @@ export interface Model {
 export function supportsVision(model: Model): boolean {
   return model.modalities?.input?.includes('image') ?? false
 }
+
+export * from './playground'

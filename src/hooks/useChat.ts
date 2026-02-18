@@ -1,13 +1,99 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { type Conversation, type Message, type Settings, type Model } from '@/types'
-import { loadConversations, saveConversations } from '@/lib/storage'
+import {
+  initializeStorage,
+  loadConversations,
+  saveConversation,
+  deleteConversation as deleteConversationFromDB,
+  getActiveConversationId,
+  setActiveConversationId
+} from '@/lib/chatStorage'
 import { chatWithLLM, generateImage, editImage, generateVideo, type ChatMessage } from '@/lib/api'
 
 export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [storageError, setStorageError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Initialize storage and load conversations
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Initialize IndexedDB and handle migration
+        const { available, error } = await initializeStorage()
+        
+        if (!available) {
+          setStorageError(error || 'Storage not available')
+          setIsLoading(false)
+          return
+        }
+        
+        // Load conversations from IndexedDB
+        const loaded = await loadConversations()
+        
+        // Get last active conversation
+        const activeId = await getActiveConversationId()
+        
+        if (loaded.length === 0) {
+          // Create first conversation
+          const newConv: Conversation = {
+            id: crypto.randomUUID(),
+            title: 'New Chat',
+            messages: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          }
+          setConversations([newConv])
+          setCurrentConversationId(newConv.id)
+          await saveConversation(newConv)
+          await setActiveConversationId(newConv.id)
+        } else {
+          setConversations(loaded)
+          // Restore active conversation or use first
+          const convToActivate = activeId && loaded.find(c => c.id === activeId)
+            ? activeId
+            : loaded[0].id
+          setCurrentConversationId(convToActivate)
+        }
+      } catch (error) {
+        console.error('Failed to initialize chat:', error)
+        setStorageError('Failed to load conversations')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    init()
+  }, [])
+
+  // Auto-save conversations when they change
+  useEffect(() => {
+    const saveAll = async () => {
+      if (conversations.length === 0 || isLoading) return
+      
+      try {
+        for (const conversation of conversations) {
+          await saveConversation(conversation)
+        }
+      } catch (error) {
+        console.error('Failed to save conversations:', error)
+      }
+    }
+    
+    saveAll()
+  }, [conversations, isLoading])
+
+  // Save active conversation ID when it changes
+  useEffect(() => {
+    if (currentConversationId) {
+      setActiveConversationId(currentConversationId).catch(console.error)
+    }
+  }, [currentConversationId])
 
   const createNewConversation = useCallback(() => {
     const newConversation: Conversation = {
@@ -21,24 +107,6 @@ export function useChat(settings: Settings, models: Model[] = []) {
     setCurrentConversationId(newConversation.id)
     return newConversation
   }, [])
-
-  useEffect(() => {
-    const loaded = loadConversations()
-    if (loaded.length === 0) {
-      const newConv = createNewConversation()
-      setCurrentConversationId(newConv.id)
-    } else {
-      setConversations(loaded)
-      setCurrentConversationId(loaded[0].id)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (conversations.length > 0) {
-      saveConversations(conversations)
-    }
-  }, [conversations])
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
 
@@ -288,15 +356,20 @@ export function useChat(settings: Settings, models: Model[] = []) {
     }
   }, [currentConversation, settings, createNewConversation, models])
 
-  const deleteConversation = useCallback((id: string) => {
-    setConversations(prev => prev.filter(c => c.id !== id))
-    if (currentConversationId === id) {
-      const remaining = conversations.filter(c => c.id !== id)
-      if (remaining.length > 0) {
-        setCurrentConversationId(remaining[0].id)
-      } else {
-        createNewConversation()
+  const deleteConversation = useCallback(async (id: string) => {
+    try {
+      await deleteConversationFromDB(id)
+      setConversations(prev => prev.filter(c => c.id !== id))
+      if (currentConversationId === id) {
+        const remaining = conversations.filter(c => c.id !== id)
+        if (remaining.length > 0) {
+          setCurrentConversationId(remaining[0].id)
+        } else {
+          createNewConversation()
+        }
       }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error)
     }
   }, [conversations, currentConversationId, createNewConversation])
 
@@ -325,6 +398,8 @@ export function useChat(settings: Settings, models: Model[] = []) {
     currentConversation,
     currentConversationId,
     isStreaming,
+    isLoading,
+    storageError,
     createNewConversation,
     sendMessage,
     deleteConversation,

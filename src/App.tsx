@@ -4,6 +4,7 @@ import { useChat } from './hooks/useChat'
 import { Sidebar } from './components/Sidebar'
 import { ChatContainer } from './components/ChatContainer'
 import { ChatInput } from './components/ChatInput'
+import { PromptPlayground } from './components/PromptPlayground'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Settings, Menu, X, Loader2 } from 'lucide-react'
@@ -16,6 +17,7 @@ function App() {
   
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [showLab, setShowLab] = useState(false)
   const [models, setModels] = useState<Model[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
 
@@ -24,6 +26,8 @@ function App() {
     currentConversation,
     currentConversationId,
     isStreaming,
+    isLoading: isLoadingConversations,
+    storageError,
     createNewConversation,
     sendMessage,
     deleteConversation,
@@ -55,11 +59,28 @@ function App() {
     loadModels()
   }, [loadModels])
 
-  if (!settingsLoaded) {
+  if (!settingsLoaded || isLoadingConversations) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background text-foreground">
         <div className="text-center">
-          <p className="text-muted-foreground">Loading...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">
+            {isLoadingConversations ? 'Loading conversations...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (storageError) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background text-foreground">
+        <div className="text-center max-w-md p-6">
+          <p className="text-destructive mb-4">Storage Error</p>
+          <p className="text-sm text-muted-foreground mb-4">{storageError}</p>
+          <p className="text-xs text-muted-foreground">
+            Please try using a different browser or disable private browsing mode.
+          </p>
         </div>
       </div>
     )
@@ -69,6 +90,11 @@ function App() {
     setIsThinking(true)
     await sendMessage(message, images, activeTool, visionModel)
     setIsThinking(false)
+  }
+
+  const handleOpenLab = () => {
+    setShowLab(true)
+    setShowSidebar(false)
   }
 
   return (
@@ -95,13 +121,17 @@ function App() {
           onNewChat={() => {
             createNewConversation()
             setShowSidebar(false)
+            setShowLab(false)
           }}
           onSelectConversation={(id) => {
             selectConversation(id)
             setShowSidebar(false)
+            setShowLab(false)
           }}
           onDeleteConversation={deleteConversation}
           onRenameConversation={renameConversation}
+          onOpenLab={handleOpenLab}
+          isLabOpen={showLab}
         />
       </aside>
 
@@ -119,7 +149,7 @@ function App() {
           </Button>
           
           <h1 className={cn('truncate font-semibold tracking-tight flex-1 min-w-0', 'text-sm sm:text-base md:text-lg')}>
-            {currentConversation?.title || 'New Chat'}
+            {showLab ? 'Prompt Playground' : currentConversation?.title || 'New Chat'}
           </h1>
           
           <div className="flex items-center gap-2 shrink-0">
@@ -168,29 +198,42 @@ function App() {
           </div>
         </header>
 
-        {/* Chat Area */}
-        <ChatContainer
-          conversation={currentConversation || null}
-          isStreaming={isStreaming}
-          apiKey={settings.apiKey}
-        />
+        {/* Content Area */}
+        {showLab ? (
+          <PromptPlayground
+            apiKey={settings.apiKey}
+            selectedModel={settings.selectedModel}
+            onModelChange={(value) => updateSettings({ selectedModel: value })}
+            models={models}
+            selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
+          />
+        ) : (
+          <>
+            {/* Chat Area */}
+            <ChatContainer
+              conversation={currentConversation || null}
+              isStreaming={isStreaming}
+              apiKey={settings.apiKey}
+            />
 
-        {/* Input Area */}
-        <ChatInput
-          onSend={handleSendMessage}
-          onStop={stopStreaming}
-          isStreaming={isStreaming}
-          disabled={!settings.apiKey}
-          apiKey={settings.apiKey}
-          isThinking={isThinking}
-          selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
-          onImageModelChange={(value) => updateSettings({ selectedImageModel: value })}
-          selectedVisionModel={settings.selectedVisionModel}
-          onVisionModelChange={(value) => updateSettings({ selectedVisionModel: value })}
-          selectedVideoResolution={settings.selectedVideoResolution || '480p'}
-          onVideoResolutionChange={(value) => updateSettings({ selectedVideoResolution: value })}
-          models={models}
-        />
+            {/* Input Area */}
+            <ChatInput
+              onSend={handleSendMessage}
+              onStop={stopStreaming}
+              isStreaming={isStreaming}
+              disabled={!settings.apiKey}
+              apiKey={settings.apiKey}
+              isThinking={isThinking}
+              selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
+              onImageModelChange={(value) => updateSettings({ selectedImageModel: value })}
+              selectedVisionModel={settings.selectedVisionModel}
+              onVisionModelChange={(value) => updateSettings({ selectedVisionModel: value })}
+              selectedVideoResolution={settings.selectedVideoResolution || '480p'}
+              onVideoResolutionChange={(value) => updateSettings({ selectedVideoResolution: value })}
+              models={models}
+            />
+          </>
+        )}
       </main>
 
       {/* Settings Dialog */}
