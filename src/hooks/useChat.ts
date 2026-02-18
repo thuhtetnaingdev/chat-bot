@@ -42,7 +42,7 @@ export function useChat(settings: Settings, models: Model[] = []) {
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
 
-  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string) => {
+  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string, visionModel?: string) => {
     let conversation = currentConversation
 
     if (!conversation) {
@@ -62,9 +62,9 @@ export function useChat(settings: Settings, models: Model[] = []) {
       role: 'assistant',
       content: activeTool === 'create_image' ? 'Generating image...' : '',
       timestamp: Date.now(),
-      model: settings.selectedModel,
+      model: activeTool === 'vision' ? (visionModel || settings.selectedModel) : settings.selectedModel,
       activeTool: activeTool,
-      toolStatus: activeTool === 'create_image' ? 'pending' : undefined,
+      toolStatus: activeTool === 'create_image' || activeTool === 'vision' ? 'pending' : undefined,
       generatedImages: []
     }
 
@@ -103,6 +103,71 @@ export function useChat(settings: Settings, models: Model[] = []) {
             const lastMsg = msgs[msgs.length - 1]
             lastMsg.content = `Generated image based on: "${prompt}"`
             lastMsg.generatedImages = [generatedImage]
+            lastMsg.toolStatus = 'success'
+            return { ...conv, messages: msgs }
+          }
+          return conv
+        }))
+      } else if (activeTool === 'vision') {
+        // Vision tool - send images to LLM
+        const modelToUse = visionModel || settings.selectedModel
+        
+        // Prepare messages with images for vision model
+        const messages: ChatMessage[] = [
+          ...(settings.instructions ? [{ role: 'system', content: settings.instructions }] : []),
+          ...conversation.messages.map((msg): ChatMessage => {
+            // Only send text content, ignore images for API
+            return {
+              role: msg.role,
+              content: typeof msg.content === 'string' ? msg.content : ''
+            }
+          }),
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: userMessage.replace(/@vision\s*/gi, '').trim() || 'Analyze this image'
+              },
+              ...(images || []).map(img => ({
+                type: 'image_url' as const,
+                image_url: { url: img }
+              }))
+            ]
+          }
+        ]
+
+        let accumulatedContent = ''
+
+        // Get max_tokens for the vision model
+        const selectedModel = models.find(m => m.id === modelToUse)
+        const max_tokens = selectedModel?.max_tokens
+
+        await chatWithLLM(
+          messages,
+          settings.apiKey,
+          modelToUse,
+          (content) => {
+            accumulatedContent += content
+            setConversations(prev => prev.map(conv => {
+              if (conv.id === conversation!.id) {
+                const msgs = [...conv.messages]
+                const lastMsg = msgs[msgs.length - 1]
+                lastMsg.content = accumulatedContent
+                return { ...conv, messages: msgs }
+              }
+              return conv
+            }))
+          },
+          abortControllerRef.current.signal,
+          max_tokens
+        )
+
+        // Mark as success after completion
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversation!.id) {
+            const msgs = [...conv.messages]
+            const lastMsg = msgs[msgs.length - 1]
             lastMsg.toolStatus = 'success'
             return { ...conv, messages: msgs }
           }

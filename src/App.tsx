@@ -65,9 +65,9 @@ function App() {
     )
   }
 
-  const handleSendMessage = async (message: string, images?: string[], activeTool?: string) => {
+  const handleSendMessage = async (message: string, images?: string[], activeTool?: string, visionModel?: string) => {
     setIsThinking(true)
-    await sendMessage(message, images, activeTool)
+    await sendMessage(message, images, activeTool, visionModel)
     setIsThinking(false)
   }
 
@@ -185,6 +185,9 @@ function App() {
           isThinking={isThinking}
           selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
           onImageModelChange={(value) => updateSettings({ selectedImageModel: value })}
+          selectedVisionModel={settings.selectedVisionModel}
+          onVisionModelChange={(value) => updateSettings({ selectedVisionModel: value })}
+          models={models}
         />
       </main>
 

@@ -25,6 +25,13 @@ export const availableTools: Tool[] = [
     description: 'Generate images from text descriptions using AI',
     icon: 'image',
     pattern: '@create_image'
+  },
+  {
+    id: 'vision',
+    name: 'Vision',
+    description: 'Analyze images and videos using vision-capable models',
+    icon: 'eye',
+    pattern: '@vision'
   }
 ]
 
@@ -62,6 +69,7 @@ export interface Settings {
   instructions: string
   selectedModel: string
   selectedImageModel: string
+  selectedVisionModel: string
 }
 
 export interface Model {
@@ -69,4 +77,12 @@ export interface Model {
   name: string
   cost: number
   max_tokens?: number
+  modalities?: {
+    input: string[]
+    output: string[]
+  }
+}
+
+export function supportsVision(model: Model): boolean {
+  return model.modalities?.input?.includes('image') ?? false
 }

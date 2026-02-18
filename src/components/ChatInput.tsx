@@ -8,10 +8,10 @@ import { useAudioVisualizer } from '@/hooks/useAudioVisualizer'
 import { AudioVisualizer } from '@/components/AudioVisualizer'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
-import { availableTools, type Tool, IMAGE_MODELS } from '@/types'
+import { availableTools, type Tool, IMAGE_MODELS, type Model } from '@/types'
 
 export interface ChatInputProps {
-  onSend: (message: string, images?: string[], activeTool?: string) => Promise<void>
+  onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string) => Promise<void>
   onStop: () => void
   isStreaming: boolean
   disabled?: boolean
@@ -19,9 +19,23 @@ export interface ChatInputProps {
   isThinking: boolean
   selectedImageModel?: string
   onImageModelChange?: (model: string) => void
+  selectedVisionModel?: string
+  onVisionModelChange?: (model: string) => void
+  models?: Model[]
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', selectedImageModel = 'z-image-turbo', onImageModelChange }: ChatInputProps) {
+export function ChatInput({ 
+  onSend, 
+  onStop, 
+  isStreaming, 
+  disabled, 
+  apiKey = '', 
+  selectedImageModel = 'z-image-turbo', 
+  onImageModelChange,
+  selectedVisionModel = '',
+  onVisionModelChange,
+  models = []
+}: ChatInputProps) {
   const [input, setInput] = useState('')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null)
@@ -87,12 +101,31 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
     processTranscription()
   }, [audioBlob, apiKey, isTranscribing, resetRecording])
 
+  // Get vision-supported models
+  const visionModels = models.filter(m => m.modalities?.input?.includes('image'))
+
+  // Get the first vision model as default if none selected
+  const effectiveVisionModel = selectedVisionModel || (visionModels.length > 0 ? visionModels[0].id : '')
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if ((input.trim() || selectedImages.length > 0) && !isStreaming && !disabled && !isTranscribing && !isProcessingOCR) {
       const activeTool = getActiveTool()
       
-      // If there are images, process OCR in background first
+      // If using @vision tool, don't do OCR - send images to LLM directly
+      if (activeTool === 'vision') {
+        if (selectedImages.length === 0) {
+          setTranscriptionError('Please upload at least one image for vision analysis')
+          return
+        }
+        
+        await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel)
+        setInput('')
+        setSelectedImages([])
+        return
+      }
+      
+      // If there are images, process OCR in background first (for non-vision tools)
       if (selectedImages.length > 0 && apiKey) {
         setIsProcessingOCR(true)
         try {
@@ -145,10 +178,17 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
     if (!files || files.length === 0) return
 
     const images: string[] = []
+    const activeTool = getActiveTool()
+    const isVisionMode = activeTool === 'vision'
 
     try {
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) continue
+        // For vision mode, accept both images and videos
+        if (isVisionMode) {
+          if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue
+        } else {
+          if (!file.type.startsWith('image/')) continue
+        }
         
         const base64 = await processImageFile(file)
         images.push(base64)
@@ -157,7 +197,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
       setSelectedImages(prev => [...prev, ...images])
     } catch (error) {
       console.error('File processing error:', error)
-      setTranscriptionError('Failed to process image')
+      setTranscriptionError('Failed to process file')
     } finally {
       // Reset file input
       if (fileInputRef.current) {
@@ -368,6 +408,25 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
             </div>
           )}
 
+          {/* Model Selector for Vision */}
+          {activeTool === 'vision' && visionModels.length > 0 && (
+            <div className="mb-2 flex items-center gap-2 px-1">
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Vision Model:</span>
+              <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
+                <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {visionModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                      {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Main Input Area - Mobile: stacked, Desktop: side by side */}
           <div className="flex flex-col gap-2">
             {/* Text Input Row */}
@@ -377,7 +436,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, apiKey = '', 
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept="image/*"
+                accept={activeTool === 'vision' ? 'image/*,video/*' : 'image/*'}
                 multiple
                 className="hidden"
               />

@@ -347,7 +347,8 @@ export const fetchModels = async (): Promise<Model[]> => {
         id: string; 
         name: string; 
         cost: unknown; 
-        limit?: { output?: number } 
+        limit?: { output?: number }
+        modalities?: { input?: string[]; output?: string[] }
       }
       const costModel = m.cost
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -356,7 +357,11 @@ export const fetchModels = async (): Promise<Model[]> => {
         id: m.id,
         name: m.name,
         cost,
-        max_tokens: m.limit?.output
+        max_tokens: m.limit?.output,
+        modalities: m.modalities ? {
+          input: m.modalities.input || [],
+          output: m.modalities.output || []
+        } : undefined
       }
     })
     console.log('Fetched models:', modelsArray)

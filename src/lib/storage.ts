@@ -36,7 +36,8 @@ export const loadSettings = (): Settings => {
       apiKey: '',
       instructions: '',
       selectedModel: 'unsloth/gemma-3-27b-it',
-      selectedImageModel: 'z-image-turbo'
+      selectedImageModel: 'z-image-turbo',
+      selectedVisionModel: ''
     }
   }
   try {
@@ -46,7 +47,8 @@ export const loadSettings = (): Settings => {
       apiKey: '',
       instructions: '',
       selectedModel: 'unsloth/gemma-3-27b-it',
-      selectedImageModel: 'z-image-turbo'
+      selectedImageModel: 'z-image-turbo',
+      selectedVisionModel: ''
     }
   }
 }
