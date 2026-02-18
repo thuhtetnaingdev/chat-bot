@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { type Conversation, type Message, type Settings, type Model } from '@/types'
 import { loadConversations, saveConversations } from '@/lib/storage'
-import { chatWithLLM, generateImage, editImage, type ChatMessage } from '@/lib/api'
+import { chatWithLLM, generateImage, editImage, generateVideo, type ChatMessage } from '@/lib/api'
 
 export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -60,12 +60,13 @@ export function useChat(settings: Settings, models: Model[] = []) {
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : '',
+      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : activeTool === 'create_video' ? 'Generating video...' : '',
       timestamp: Date.now(),
       model: activeTool === 'vision' ? (visionModel || settings.selectedModel) : settings.selectedModel,
       activeTool: activeTool,
-      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' ? 'pending' : undefined,
-      generatedImages: []
+      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' || activeTool === 'create_video' ? 'pending' : undefined,
+      generatedImages: [],
+      generatedVideos: []
     }
 
     setConversations(prev => prev.map(conv => {
@@ -193,6 +194,32 @@ export function useChat(settings: Settings, models: Model[] = []) {
             const lastMsg = msgs[msgs.length - 1]
             lastMsg.content = `Edited image based on: "${prompt}"`
             lastMsg.generatedImages = [editedImage]
+            lastMsg.toolStatus = 'success'
+            return { ...conv, messages: msgs }
+          }
+          return conv
+        }))
+      } else if (activeTool === 'create_video') {
+        // Extract prompt by removing the @create_video mention
+        const prompt = userMessage.replace(/@create_video\s*/gi, '').trim()
+        
+        if (!prompt) {
+          throw new Error('Please provide a description for the video you want to generate.')
+        }
+
+        // Get the first image if provided (optional for video generation)
+        const image = images && images.length > 0 ? images[0] : undefined
+
+        const generatedVideo = await generateVideo(prompt, settings.apiKey, image, settings.selectedVideoResolution)
+
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversation!.id) {
+            const msgs = [...conv.messages]
+            const lastMsg = msgs[msgs.length - 1]
+            lastMsg.content = image 
+              ? `Generated video based on image and prompt: "${prompt}"`
+              : `Generated video based on: "${prompt}"`
+            lastMsg.generatedVideos = [generatedVideo]
             lastMsg.toolStatus = 'success'
             return { ...conv, messages: msgs }
           }

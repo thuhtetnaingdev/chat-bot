@@ -8,7 +8,7 @@ import { useAudioVisualizer } from '@/hooks/useAudioVisualizer'
 import { AudioVisualizer } from '@/components/AudioVisualizer'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
-import { availableTools, type Tool, IMAGE_MODELS, type Model } from '@/types'
+import { availableTools, type Tool, IMAGE_MODELS, VIDEO_RESOLUTIONS, type Model } from '@/types'
 
 export interface ChatInputProps {
   onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string) => Promise<void>
@@ -21,19 +21,23 @@ export interface ChatInputProps {
   onImageModelChange?: (model: string) => void
   selectedVisionModel?: string
   onVisionModelChange?: (model: string) => void
+  selectedVideoResolution?: string
+  onVideoResolutionChange?: (resolution: string) => void
   models?: Model[]
 }
 
-export function ChatInput({ 
-  onSend, 
-  onStop, 
-  isStreaming, 
-  disabled, 
-  apiKey = '', 
-  selectedImageModel = 'z-image-turbo', 
+export function ChatInput({
+  onSend,
+  onStop,
+  isStreaming,
+  disabled,
+  apiKey = '',
+  selectedImageModel = 'z-image-turbo',
   onImageModelChange,
   selectedVisionModel = '',
   onVisionModelChange,
+  selectedVideoResolution = '480p',
+  onVideoResolutionChange,
   models = []
 }: ChatInputProps) {
   const [input, setInput] = useState('')
@@ -133,6 +137,14 @@ export function ChatInput({
         }
 
         await onSend(input.trim(), selectedImages, activeTool)
+        setInput('')
+        setSelectedImages([])
+        return
+      }
+
+      // If using @create_video tool, don't do OCR - send images for video generation (optional)
+      if (activeTool === 'create_video') {
+        await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool)
         setInput('')
         setSelectedImages([])
         return
@@ -433,6 +445,25 @@ export function ChatInput({
                   {visionModels.map((model) => (
                     <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
                       {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Resolution Selector for Video Generation */}
+          {activeTool === 'create_video' && (
+            <div className="mb-2 flex items-center gap-2 px-1">
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Resolution:</span>
+              <Select value={selectedVideoResolution} onValueChange={onVideoResolutionChange}>
+                <SelectTrigger className="w-[100px] sm:w-[120px] h-7 sm:h-8 text-[10px] sm:text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VIDEO_RESOLUTIONS.map((res) => (
+                    <SelectItem key={res.id} value={res.id} className="text-[10px] sm:text-xs">
+                      {res.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

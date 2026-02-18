@@ -9,7 +9,8 @@ export const saveConversations = (conversations: Conversation[]): void => {
     messages: conv.messages.map(msg => ({
       ...msg,
       images: undefined,
-      generatedImages: undefined
+      generatedImages: undefined,
+      generatedVideos: undefined
     }))
   }))
   localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversationsToSave))
@@ -37,18 +38,25 @@ export const loadSettings = (): Settings => {
       instructions: '',
       selectedModel: 'unsloth/gemma-3-27b-it',
       selectedImageModel: 'z-image-turbo',
-      selectedVisionModel: ''
+      selectedVisionModel: '',
+      selectedVideoResolution: '480p'
     }
   }
   try {
-    return JSON.parse(data)
+    const parsed = JSON.parse(data)
+    // Ensure selectedVideoResolution has a default value
+    if (!parsed.selectedVideoResolution) {
+      parsed.selectedVideoResolution = '480p'
+    }
+    return parsed
   } catch {
     return {
       apiKey: '',
       instructions: '',
       selectedModel: 'unsloth/gemma-3-27b-it',
       selectedImageModel: 'z-image-turbo',
-      selectedVisionModel: ''
+      selectedVisionModel: '',
+      selectedVideoResolution: '480p'
     }
   }
 }

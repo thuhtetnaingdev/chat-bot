@@ -187,6 +187,8 @@ function App() {
           onImageModelChange={(value) => updateSettings({ selectedImageModel: value })}
           selectedVisionModel={settings.selectedVisionModel}
           onVisionModelChange={(value) => updateSettings({ selectedVisionModel: value })}
+          selectedVideoResolution={settings.selectedVideoResolution || '480p'}
+          onVideoResolutionChange={(value) => updateSettings({ selectedVideoResolution: value })}
           models={models}
         />
       </main>

@@ -2,7 +2,7 @@ import { type Message } from '@/types'
 import { useState, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronDown, ChevronRight, Brain, Terminal, User, Loader2, Volume2, VolumeX, ImageIcon, Download } from 'lucide-react'
+import { ChevronDown, ChevronRight, Brain, Terminal, User, Loader2, Volume2, VolumeX, ImageIcon, Video, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -123,6 +123,16 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
     document.body.removeChild(link)
   }
 
+  // Download generated video
+  const handleDownloadVideo = (videoData: string, index: number) => {
+    const link = document.createElement('a')
+    link.href = videoData
+    link.download = `generated-video-${index}-${Date.now()}.mp4`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const handleSpeak = async () => {
     if (!apiKey || !response) return
 
@@ -215,9 +225,13 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
                   {/* Tool Status Badge */}
                   {message.activeTool && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 w-fit">
-                      <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                      {message.activeTool === 'create_video' ? (
+                        <Video className="h-3.5 w-3.5 text-primary" />
+                      ) : (
+                        <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                      )}
                       <span className="text-xs font-medium text-primary">
-                        {message.activeTool === 'create_image' ? 'Create Image' : message.activeTool}
+                        {message.activeTool === 'create_image' ? 'Create Image' : message.activeTool === 'create_video' ? 'Create Video' : message.activeTool}
                       </span>
                       {message.toolStatus === 'pending' && (
                         <Loader2 className="h-3 w-3 text-primary animate-spin" />
@@ -254,6 +268,42 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => handleDownloadImage(img, index)}
+                                className="absolute bottom-2 right-2 h-8 px-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Download
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Generated Videos */}
+                  {message.generatedVideos && message.generatedVideos.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">Generated Video</span>
+                        {message.toolStatus === 'pending' && (
+                          <Loader2 className="h-3 w-3 text-muted-foreground animate-spin" />
+                        )}
+                      </div>
+                      <div className="grid gap-3">
+                        {message.generatedVideos.map((video, index) => (
+                          <div key={index} className="relative group rounded-lg border border-border/50 overflow-hidden bg-muted/30">
+                            <video
+                              src={video}
+                              controls
+                              className="w-full h-auto max-h-96 object-contain"
+                              preload="metadata"
+                            />
+                            {message.toolStatus === 'success' && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleDownloadVideo(video, index)}
                                 className="absolute bottom-2 right-2 h-8 px-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                               >
                                 <Download className="h-3.5 w-3.5" />

@@ -4,6 +4,9 @@ const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
 const WHISPER_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe'
 const KOKORO_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak'
+const VIDEO_GENERATION_URL = 'https://chutes-wan-2-2-i2v-14b-fast.chutes.ai/generate'
+
+const DEFAULT_VIDEO_NEGATIVE_PROMPT = '色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走'
 
 const getImageGenerationUrl = (modelId: string): string => {
   const model = IMAGE_MODELS.find(m => m.id === modelId)
@@ -276,6 +279,84 @@ export const transcribeAudio = async (
       throw error
     }
     throw new Error('Unknown transcription error')
+  }
+}
+
+export const generateVideo = async (
+  prompt: string,
+  apiKey: string,
+  image?: string,
+  resolution: string = '480p'
+): Promise<string> => {
+  if (!apiKey) {
+    throw new Error('API key required for video generation')
+  }
+
+  if (!prompt) {
+    throw new Error('Prompt is required for video generation')
+  }
+
+  try {
+    const requestBody: Record<string, unknown> = {
+      prompt,
+      frames: 81,
+      resolution,
+      guidance_scale_2: 1,
+      negative_prompt: DEFAULT_VIDEO_NEGATIVE_PROMPT
+    }
+
+    // Add image if provided (strip data URL prefix)
+    if (image) {
+      const commaIndex = image.indexOf(',')
+      requestBody.image = commaIndex !== -1 ? image.slice(commaIndex + 1) : image
+    }
+
+    const response = await fetch(VIDEO_GENERATION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Video generation failed with status ${response.status}: ${errorText}`)
+    }
+
+    const contentType = response.headers.get('content-type')
+    
+    // If response is a video, convert to data URL
+    if (contentType && (contentType.startsWith('video/') || contentType === 'application/octet-stream')) {
+      const blob = await response.blob()
+      const reader = new FileReader()
+      return new Promise((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    }
+
+    // Otherwise, try to parse as JSON
+    const data = await response.json()
+
+    // Handle base64 response
+    if (data.video) {
+      return data.video
+    }
+
+    // Handle URL response
+    if (data.url) {
+      return data.url
+    }
+
+    throw new Error('No video data in response')
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('Unknown video generation error')
   }
 }
 
