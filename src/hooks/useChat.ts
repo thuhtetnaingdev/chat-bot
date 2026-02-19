@@ -9,6 +9,7 @@ import {
   setActiveConversationId
 } from '@/lib/chatStorage'
 import { chatWithLLM, generateImage, editImage, generateVideo, type ChatMessage } from '@/lib/api'
+import { agenticImageGeneration } from '@/lib/agenticImage'
 
 export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -110,7 +111,7 @@ export function useChat(settings: Settings, models: Model[] = []) {
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
 
-  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string, visionModel?: string) => {
+  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string) => {
     let conversation = currentConversation
 
     if (!conversation) {
@@ -128,13 +129,14 @@ export function useChat(settings: Settings, models: Model[] = []) {
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : activeTool === 'create_video' ? 'Generating video...' : '',
+      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : activeTool === 'create_video' ? 'Generating video...' : activeTool === 'agentic_image' ? 'Starting agentic image generation...' : '',
       timestamp: Date.now(),
       model: activeTool === 'vision' ? (visionModel || settings.selectedModel) : settings.selectedModel,
       activeTool: activeTool,
-      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' || activeTool === 'create_video' ? 'pending' : undefined,
+      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' || activeTool === 'create_video' || activeTool === 'agentic_image' ? 'pending' : undefined,
       generatedImages: [],
-      generatedVideos: []
+      generatedVideos: [],
+      agenticIterations: activeTool === 'agentic_image' ? [] : undefined
     }
 
     setConversations(prev => prev.map(conv => {
@@ -173,6 +175,105 @@ export function useChat(settings: Settings, models: Model[] = []) {
             lastMsg.content = `Generated image based on: "${prompt}"`
             lastMsg.generatedImages = [generatedImage]
             lastMsg.toolStatus = 'success'
+            return { ...conv, messages: msgs }
+          }
+          return conv
+        }))
+      } else if (activeTool === 'agentic_image') {
+        const prompt = userMessage.replace(/@agentic_image\s*/gi, '').trim()
+        
+        if (!prompt) {
+          throw new Error('Please provide a description for the image you want to generate.')
+        }
+
+        const imageModelToUse = imageModel || settings.selectedImageModel
+        const visionModelToUse = visionModel || settings.selectedVisionModel
+        const initialImage = images && images.length > 0 ? images[0] : undefined
+
+        const result = await agenticImageGeneration(
+          prompt,
+          settings.apiKey,
+          imageModelToUse,
+          visionModelToUse,
+          3,
+          initialImage,
+          {
+            onIterationStart: (iterationNumber, currentPrompt) => {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id === conversation!.id) {
+                  const msgs = [...conv.messages]
+                  const lastMsg = msgs[msgs.length - 1]
+                  lastMsg.content = `Iteration ${iterationNumber}: ${iterationNumber === 1 ? (initialImage ? 'Editing image...' : 'Generating initial image...') : `Editing image with: "${currentPrompt.slice(0, 50)}..."`}`
+                  return { ...conv, messages: msgs }
+                }
+                return conv
+              }))
+            },
+            onImageGenerated: (iterationNumber, image) => {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id === conversation!.id) {
+                  const msgs = [...conv.messages]
+                  const lastMsg = msgs[msgs.length - 1]
+                  lastMsg.content = `Iteration ${iterationNumber}: Verifying with vision model...`
+                  // Only show current iteration's image, not accumulated history
+                  lastMsg.generatedImages = [image]
+                  return { ...conv, messages: msgs }
+                }
+                return conv
+              }))
+            },
+            onVisionCheck: (iterationNumber, feedback) => {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id === conversation!.id) {
+                  const msgs = [...conv.messages]
+                  const lastMsg = msgs[msgs.length - 1]
+                  
+                  if (lastMsg.agenticIterations) {
+                    // Check if iteration already exists, update it instead of adding duplicate
+                    const existingIndex = lastMsg.agenticIterations.findIndex(
+                      iter => iter.iterationNumber === iterationNumber
+                    )
+                    
+                    const iterationData = {
+                      iterationNumber,
+                      image: lastMsg.generatedImages?.[0] || '',
+                      editPrompt: '',
+                      visionFeedback: feedback
+                    }
+                    
+                    if (existingIndex >= 0) {
+                      // Update existing iteration
+                      lastMsg.agenticIterations[existingIndex] = iterationData
+                    } else {
+                      // Add new iteration
+                      lastMsg.agenticIterations.push(iterationData)
+                    }
+                  }
+                  
+                  if (feedback.satisfied) {
+                    lastMsg.content = `✓ Image satisfied requirements after ${iterationNumber} iteration${iterationNumber > 1 ? 's' : ''}`
+                  } else {
+                    lastMsg.content = `Iteration ${iterationNumber}: Issues found - ${feedback.issues.slice(0, 2).join(', ')}${feedback.issues.length > 2 ? '...' : ''}`
+                  }
+                  return { ...conv, messages: msgs }
+                }
+                return conv
+              }))
+            }
+          }
+        )
+
+        // Final update with all iterations
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversation!.id) {
+            const msgs = [...conv.messages]
+            const lastMsg = msgs[msgs.length - 1]
+            lastMsg.content = result.success 
+              ? `✓ Generated image with ${result.totalIterations} iteration${result.totalIterations > 1 ? 's' : ''}: "${prompt}"`
+              : `⚠ Max iterations reached. Best result after ${result.totalIterations} iterations: "${prompt}"`
+            lastMsg.generatedImages = [result.finalImage]
+            lastMsg.agenticIterations = result.iterations
+            lastMsg.toolStatus = result.success ? 'success' : 'error'
             return { ...conv, messages: msgs }
           }
           return conv

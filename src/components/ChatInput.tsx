@@ -11,7 +11,7 @@ import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
 import { availableTools, type Tool, IMAGE_MODELS, VIDEO_RESOLUTIONS, type Model } from '@/types'
 
 export interface ChatInputProps {
-  onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string) => Promise<void>
+  onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string) => Promise<void>
   onStop: () => void
   isStreaming: boolean
   disabled?: boolean
@@ -123,7 +123,7 @@ export function ChatInput({
           return
         }
 
-        await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel)
+        await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel, selectedImageModel)
         setInput('')
         setSelectedImages([])
         return
@@ -136,7 +136,7 @@ export function ChatInput({
           return
         }
 
-        await onSend(input.trim(), selectedImages, activeTool)
+        await onSend(input.trim(), selectedImages, activeTool, undefined, selectedImageModel)
         setInput('')
         setSelectedImages([])
         return
@@ -144,7 +144,15 @@ export function ChatInput({
 
       // If using @create_video tool, don't do OCR - send images for video generation (optional)
       if (activeTool === 'create_video') {
-        await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool)
+        await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool, undefined, selectedImageModel)
+        setInput('')
+        setSelectedImages([])
+        return
+      }
+
+      // If using @agentic_image tool, pass images for edit mode if provided
+      if (activeTool === 'agentic_image') {
+        await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool, effectiveVisionModel, selectedImageModel)
         setInput('')
         setSelectedImages([])
         return
@@ -468,6 +476,55 @@ export function ChatInput({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {/* Model Selectors for Agentic Image */}
+          {activeTool === 'agentic_image' && (
+            <div className="mb-2 flex flex-wrap items-center gap-3 px-1">
+              {/* Show Image Model only when no images uploaded (create mode) */}
+              {selectedImages.length === 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Image Model:</span>
+                  <Select value={selectedImageModel} onValueChange={onImageModelChange}>
+                    <SelectTrigger className="w-[120px] sm:w-[160px] h-7 sm:h-8 text-[10px] sm:text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IMAGE_MODELS.map((model) => (
+                        <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {/* Show Edit Mode badge when images uploaded */}
+              {selectedImages.length > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
+                  <span className="text-[10px] sm:text-xs font-medium text-primary">Edit Mode</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">({selectedImages.length} image{selectedImages.length > 1 ? 's' : ''})</span>
+                </div>
+              )}
+              {/* Always show Vision Model selector */}
+              {visionModels.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Vision Model:</span>
+                  <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
+                    <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {visionModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           )}
 

@@ -1,4 +1,4 @@
-import { type Model, IMAGE_MODELS } from '@/types'
+import { type Model, IMAGE_MODELS, type VisionVerification } from '@/types'
 
 const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
@@ -235,6 +235,118 @@ export const editImage = async (
       throw error
     }
     throw new Error('Unknown image editing error')
+  }
+}
+
+export const verifyImageWithVision = async (
+  imageBase64: string,
+  originalPrompt: string,
+  apiKey: string,
+  visionModel: string
+): Promise<VisionVerification> => {
+  if (!apiKey) {
+    throw new Error('API key required for image verification')
+  }
+
+  const systemPrompt = `You are an image quality verification assistant. Your job is to analyze generated images and determine if they match the user's request.
+
+Analyze the image and compare it to the original prompt. Check for:
+1. All requested elements present
+2. Correct style, mood, or atmosphere
+3. Realistic proportions and physics (unless stylized was requested)
+4. No unintended artifacts or distortions
+5. Overall quality and coherence
+
+Respond in JSON format only:
+{
+  "satisfied": boolean,
+  "issues": ["issue1", "issue2", ...],
+  "suggestedEdit": "A concise edit prompt to fix the issues"
+}
+
+If satisfied is true, issues should be empty and suggestedEdit should be an empty string.
+If satisfied is false, list specific issues and provide a clear edit prompt to address them.`
+
+  const requestBody = {
+    model: visionModel,
+    messages: [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Original prompt: "${originalPrompt}"\n\nAnalyze this generated image and determine if it satisfies the prompt.`
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: imageBase64
+            }
+          }
+        ]
+      }
+    ],
+    max_tokens: 1024,
+    temperature: 0.3
+  }
+
+  try {
+    const response = await fetch(LLM_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Vision verification failed with status ${response.status}: ${errorText}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content || ''
+    
+    // Extract JSON from response (handle potential markdown code blocks)
+    let jsonStr = content
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim()
+    }
+    
+    // Find JSON object in the response
+    const jsonObjectMatch = jsonStr.match(/\{[\s\S]*\}/)
+    if (!jsonObjectMatch) {
+      // Default to satisfied if we can't parse
+      return {
+        satisfied: true,
+        issues: [],
+        suggestedEdit: ''
+      }
+    }
+
+    const parsed = JSON.parse(jsonObjectMatch[0])
+    
+    return {
+      satisfied: Boolean(parsed.satisfied),
+      issues: Array.isArray(parsed.issues) ? parsed.issues.filter((i: unknown): i is string => typeof i === 'string') : [],
+      suggestedEdit: typeof parsed.suggestedEdit === 'string' ? parsed.suggestedEdit : ''
+    }
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      // JSON parse error - default to satisfied
+      return {
+        satisfied: true,
+        issues: [],
+        suggestedEdit: ''
+      }
+    }
+    throw error
   }
 }
 
