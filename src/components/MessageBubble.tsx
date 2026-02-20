@@ -259,11 +259,13 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
                           <Video className="h-3.5 w-3.5 text-primary" />
                         ) : message.activeTool === 'agentic_image' ? (
                           <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        ) : message.activeTool === 'agentic_video' ? (
+                          <Sparkles className="h-3.5 w-3.5 text-primary" />
                         ) : (
                           <ImageIcon className="h-3.5 w-3.5 text-primary" />
                         )}
                         <span className="text-xs font-medium text-primary">
-                          {message.activeTool === 'create_image' ? 'Create Image' : message.activeTool === 'create_video' ? 'Create Video' : message.activeTool === 'agentic_image' ? 'Agentic Image' : message.activeTool}
+                          {message.activeTool === 'create_image' ? 'Create Image' : message.activeTool === 'create_video' ? 'Create Video' : message.activeTool === 'agentic_image' ? 'Agentic Image' : message.activeTool === 'agentic_video' ? 'Agentic Video' : message.activeTool}
                         </span>
                         {message.toolStatus === 'pending' && (
                           <Loader2 className="h-3 w-3 text-primary animate-spin" />
@@ -277,7 +279,7 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
                       </div>
                     )}
 
-                    {/* Agentic Iterations */}
+                    {/* Agentic Image Iterations */}
                     {message.agenticIterations && message.agenticIterations.length > 0 && (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
@@ -309,6 +311,58 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
                                   alt={`Iteration ${iteration.iterationNumber}`}
                                   className="w-full h-auto max-h-48 object-contain rounded border border-border/30 cursor-pointer hover:opacity-90 transition-opacity"
                                   onClick={() => setPreviewImage(iteration.image)}
+                                />
+                                {iteration.visionFeedback.issues.length > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    <span className="font-medium">Issues: </span>
+                                    {iteration.visionFeedback.issues.join(', ')}
+                                  </div>
+                                )}
+                                {iteration.visionFeedback.suggestedEdit && !iteration.visionFeedback.satisfied && (
+                                  <div className="text-xs text-primary/80">
+                                    <span className="font-medium">Edit prompt: </span>
+                                    {iteration.visionFeedback.suggestedEdit}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Agentic Video Iterations */}
+                    {message.agenticVideoIterations && message.agenticVideoIterations.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">Refinement Process ({message.agenticVideoIterations.length} iteration{message.agenticVideoIterations.length > 1 ? 's' : ''})</span>
+                        </div>
+                        <div className="space-y-3">
+                          {message.agenticVideoIterations.map((iteration, index) => (
+                            <div key={index} className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+                              <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border/30">
+                                <div className="flex items-center gap-2">
+                                  <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-xs font-medium">Iteration {iteration.iterationNumber}</span>
+                                </div>
+                                {iteration.visionFeedback.satisfied ? (
+                                  <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    <span className="text-xs">Satisfied</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                    <XCircle className="h-3.5 w-3.5" />
+                                    <span className="text-xs">Needs improvement</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-3 space-y-2">
+                                <video
+                                  src={iteration.video}
+                                  controls
+                                  className="w-full h-auto max-h-48 object-contain rounded border border-border/30"
+                                  preload="metadata"
                                 />
                                 {iteration.visionFeedback.issues.length > 0 && (
                                   <div className="text-xs text-muted-foreground">
@@ -366,8 +420,9 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
                       </div>
                     )}
 
-                    {/* Generated Videos */}
-                    {message.generatedVideos && message.generatedVideos.length > 0 && (
+                    {/* Generated Videos - only show if no agentic video iterations or if completed */}
+                    {message.generatedVideos && message.generatedVideos.length > 0 && 
+                     (!message.agenticVideoIterations || message.agenticVideoIterations.length === 0 || message.toolStatus === 'success') && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-muted-foreground">Generated Video</span>

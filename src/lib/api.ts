@@ -350,6 +350,118 @@ If satisfied is false, list specific issues and provide a clear edit prompt to a
   }
 }
 
+export const verifyVideoWithVision = async (
+  videoBase64: string,
+  originalPrompt: string,
+  apiKey: string,
+  visionModel: string
+): Promise<VisionVerification> => {
+  if (!apiKey) {
+    throw new Error('API key required for video verification')
+  }
+
+  const systemPrompt = `You are a video quality verification assistant. Your job is to analyze generated videos and determine if they match the user's request.
+
+Analyze the video and compare it to the original prompt. Check for:
+1. All requested elements present in the video
+2. Correct motion, animation, and temporal coherence
+3. Consistent style and quality throughout the video
+4. No unintended artifacts, flickering, or distortions
+5. Overall video quality and alignment with the prompt
+
+Respond in JSON format only:
+{
+  "satisfied": boolean,
+  "issues": ["issue1", "issue2", ...],
+  "suggestedEdit": "A concise edit prompt to fix the issues"
+}
+
+If satisfied is true, issues should be empty and suggestedEdit should be an empty string.
+If satisfied is false, list specific issues and provide a clear edit prompt to address them.`
+
+  const requestBody = {
+    model: visionModel,
+    messages: [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Original prompt: "${originalPrompt}"\n\nAnalyze this generated video and determine if it satisfies the prompt.`
+          },
+          {
+            type: 'video_url',
+            video_url: {
+              url: videoBase64
+            }
+          }
+        ]
+      }
+    ],
+    max_tokens: 1024,
+    temperature: 0.3
+  }
+
+  try {
+    const response = await fetch(LLM_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Vision verification failed with status ${response.status}: ${errorText}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content || ''
+    
+    // Extract JSON from response (handle potential markdown code blocks)
+    let jsonStr = content
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim()
+    }
+    
+    // Find JSON object in the response
+    const jsonObjectMatch = jsonStr.match(/\{[\s\S]*\}/)
+    if (!jsonObjectMatch) {
+      // Default to satisfied if we can't parse
+      return {
+        satisfied: true,
+        issues: [],
+        suggestedEdit: ''
+      }
+    }
+
+    const parsed = JSON.parse(jsonObjectMatch[0])
+    
+    return {
+      satisfied: Boolean(parsed.satisfied),
+      issues: Array.isArray(parsed.issues) ? parsed.issues.filter((i: unknown): i is string => typeof i === 'string') : [],
+      suggestedEdit: typeof parsed.suggestedEdit === 'string' ? parsed.suggestedEdit : ''
+    }
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      // JSON parse error - default to satisfied
+      return {
+        satisfied: true,
+        issues: [],
+        suggestedEdit: ''
+      }
+    }
+    throw error
+  }
+}
+
 export const transcribeAudio = async (
   audioBlob: Blob,
   apiKey: string

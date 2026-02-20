@@ -10,6 +10,7 @@ import {
 } from '@/lib/chatStorage'
 import { chatWithLLM, generateImage, editImage, generateVideo, type ChatMessage } from '@/lib/api'
 import { agenticImageGeneration } from '@/lib/agenticImage'
+import { agenticVideoGeneration } from '@/lib/agenticVideo'
 
 export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -111,7 +112,7 @@ export function useChat(settings: Settings, models: Model[] = []) {
 
   const currentConversation = conversations.find(c => c.id === currentConversationId)
 
-  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string) => {
+  const sendMessage = useCallback(async (userMessage: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string, videoResolution?: string) => {
     let conversation = currentConversation
 
     if (!conversation) {
@@ -129,14 +130,15 @@ export function useChat(settings: Settings, models: Model[] = []) {
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : activeTool === 'create_video' ? 'Generating video...' : activeTool === 'agentic_image' ? 'Starting agentic image generation...' : '',
+      content: activeTool === 'create_image' ? 'Generating image...' : activeTool === 'edit_image' ? 'Editing image...' : activeTool === 'create_video' ? 'Generating video...' : activeTool === 'agentic_image' ? 'Starting agentic image generation...' : activeTool === 'agentic_video' ? 'Starting agentic video generation...' : '',
       timestamp: Date.now(),
       model: activeTool === 'vision' ? (visionModel || settings.selectedModel) : settings.selectedModel,
       activeTool: activeTool,
-      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' || activeTool === 'create_video' || activeTool === 'agentic_image' ? 'pending' : undefined,
+      toolStatus: activeTool === 'create_image' || activeTool === 'vision' || activeTool === 'edit_image' || activeTool === 'create_video' || activeTool === 'agentic_image' || activeTool === 'agentic_video' ? 'pending' : undefined,
       generatedImages: [],
       generatedVideos: [],
-      agenticIterations: activeTool === 'agentic_image' ? [] : undefined
+      agenticIterations: activeTool === 'agentic_image' ? [] : undefined,
+      agenticVideoIterations: activeTool === 'agentic_video' ? [] : undefined
     }
 
     setConversations(prev => prev.map(conv => {
@@ -273,6 +275,101 @@ export function useChat(settings: Settings, models: Model[] = []) {
               : `⚠ Max iterations reached. Best result after ${result.totalIterations} iterations: "${prompt}"`
             lastMsg.generatedImages = [result.finalImage]
             lastMsg.agenticIterations = result.iterations
+            lastMsg.toolStatus = result.success ? 'success' : 'error'
+            return { ...conv, messages: msgs }
+          }
+          return conv
+        }))
+      } else if (activeTool === 'agentic_video') {
+        const prompt = userMessage.replace(/@agentic_video\s*/gi, '').trim()
+        
+        if (!prompt) {
+          throw new Error('Please provide a description for the video you want to generate.')
+        }
+
+        const resolutionToUse = videoResolution || settings.selectedVideoResolution
+        const visionModelToUse = visionModel || settings.selectedVisionModel
+        const initialImage = images && images.length > 0 ? images[0] : undefined
+
+        const result = await agenticVideoGeneration(
+          prompt,
+          settings.apiKey,
+          resolutionToUse,
+          visionModelToUse,
+          3,
+          initialImage,
+          {
+            onIterationStart: (iterationNumber, currentPrompt) => {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id === conversation!.id) {
+                  const msgs = [...conv.messages]
+                  const lastMsg = msgs[msgs.length - 1]
+                  lastMsg.content = `Iteration ${iterationNumber}: ${iterationNumber === 1 ? (initialImage ? 'Generating video from image...' : 'Generating initial video...') : `Regenerating video with: "${currentPrompt.slice(0, 50)}..."`}`
+                  return { ...conv, messages: msgs }
+                }
+                return conv
+              }))
+            },
+            onVideoGenerated: (iterationNumber, video) => {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id === conversation!.id) {
+                  const msgs = [...conv.messages]
+                  const lastMsg = msgs[msgs.length - 1]
+                  lastMsg.content = `Iteration ${iterationNumber}: Verifying with vision model...`
+                  lastMsg.generatedVideos = [video]
+                  return { ...conv, messages: msgs }
+                }
+                return conv
+              }))
+            },
+            onVisionCheck: (iterationNumber, feedback) => {
+              setConversations(prev => prev.map(conv => {
+                if (conv.id === conversation!.id) {
+                  const msgs = [...conv.messages]
+                  const lastMsg = msgs[msgs.length - 1]
+                  
+                  if (lastMsg.agenticVideoIterations) {
+                    const existingIndex = lastMsg.agenticVideoIterations.findIndex(
+                      iter => iter.iterationNumber === iterationNumber
+                    )
+                    
+                    const iterationData = {
+                      iterationNumber,
+                      video: lastMsg.generatedVideos?.[0] || '',
+                      editPrompt: '',
+                      visionFeedback: feedback
+                    }
+                    
+                    if (existingIndex >= 0) {
+                      lastMsg.agenticVideoIterations[existingIndex] = iterationData
+                    } else {
+                      lastMsg.agenticVideoIterations.push(iterationData)
+                    }
+                  }
+                  
+                  if (feedback.satisfied) {
+                    lastMsg.content = `✓ Video satisfied requirements after ${iterationNumber} iteration${iterationNumber > 1 ? 's' : ''}`
+                  } else {
+                    lastMsg.content = `Iteration ${iterationNumber}: Issues found - ${feedback.issues.slice(0, 2).join(', ')}${feedback.issues.length > 2 ? '...' : ''}`
+                  }
+                  return { ...conv, messages: msgs }
+                }
+                return conv
+              }))
+            }
+          }
+        )
+
+        // Final update with all iterations
+        setConversations(prev => prev.map(conv => {
+          if (conv.id === conversation!.id) {
+            const msgs = [...conv.messages]
+            const lastMsg = msgs[msgs.length - 1]
+            lastMsg.content = result.success 
+              ? `✓ Generated video with ${result.totalIterations} iteration${result.totalIterations > 1 ? 's' : ''}: "${prompt}"`
+              : `⚠ Max iterations reached. Best result after ${result.totalIterations} iterations: "${prompt}"`
+            lastMsg.generatedVideos = [result.finalVideo]
+            lastMsg.agenticVideoIterations = result.iterations
             lastMsg.toolStatus = result.success ? 'success' : 'error'
             return { ...conv, messages: msgs }
           }

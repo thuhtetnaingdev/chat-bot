@@ -8,10 +8,10 @@ import { useAudioVisualizer } from '@/hooks/useAudioVisualizer'
 import { AudioVisualizer } from '@/components/AudioVisualizer'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
-import { availableTools, type Tool, IMAGE_MODELS, VIDEO_RESOLUTIONS, type Model } from '@/types'
+import { availableTools, type Tool, IMAGE_MODELS, VIDEO_RESOLUTIONS, type Model, supportsVideo } from '@/types'
 
 export interface ChatInputProps {
-  onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string) => Promise<void>
+  onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string, videoResolution?: string) => Promise<void>
   onStop: () => void
   isStreaming: boolean
   disabled?: boolean
@@ -153,6 +153,19 @@ export function ChatInput({
       // If using @agentic_image tool, pass images for edit mode if provided
       if (activeTool === 'agentic_image') {
         await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool, effectiveVisionModel, selectedImageModel)
+        setInput('')
+        setSelectedImages([])
+        return
+      }
+
+      // If using @agentic_video tool, images are mandatory
+      if (activeTool === 'agentic_video') {
+        if (selectedImages.length === 0) {
+          setTranscriptionError('Please upload at least one image for agentic video generation')
+          return
+        }
+
+        await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel, undefined, selectedVideoResolution)
         setInput('')
         setSelectedImages([])
         return
@@ -525,6 +538,61 @@ export function ChatInput({
                   </Select>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Model Selectors for Agentic Video */}
+          {activeTool === 'agentic_video' && (
+            <div className="mb-2 flex flex-wrap items-center gap-3 px-1">
+              {/* Show Image reference badge - required */}
+              {selectedImages.length > 0 ? (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
+                  <span className="text-[10px] sm:text-xs font-medium text-primary">Image</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">({selectedImages.length} uploaded)</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/10 border border-destructive/20">
+                  <span className="text-[10px] sm:text-xs font-medium text-destructive">Image Required</span>
+                </div>
+              )}
+              {/* Resolution selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Resolution:</span>
+                <Select value={selectedVideoResolution} onValueChange={onVideoResolutionChange}>
+                  <SelectTrigger className="w-[100px] sm:w-[120px] h-7 sm:h-8 text-[10px] sm:text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VIDEO_RESOLUTIONS.map((res) => (
+                      <SelectItem key={res.id} value={res.id} className="text-[10px] sm:text-xs">
+                        {res.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Vision Model selector - only show video-supporting models */}
+              {(() => {
+                const videoVisionModels = models.filter(m => supportsVideo(m))
+                const effectiveVideoVisionModel = selectedVisionModel || (videoVisionModels.length > 0 ? videoVisionModels[0].id : '')
+                return videoVisionModels.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Vision Model:</span>
+                    <Select value={effectiveVideoVisionModel} onValueChange={onVisionModelChange}>
+                      <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {videoVisionModels.map((model) => (
+                          <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                            {model.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null
+              })()}
             </div>
           )}
 

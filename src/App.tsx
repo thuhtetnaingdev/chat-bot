@@ -86,9 +86,9 @@ function App() {
     )
   }
 
-  const handleSendMessage = async (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string) => {
+  const handleSendMessage = async (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string, videoResolution?: string) => {
     setIsThinking(true)
-    await sendMessage(message, images, activeTool, visionModel, imageModel)
+    await sendMessage(message, images, activeTool, visionModel, imageModel, videoResolution)
     setIsThinking(false)
   }
 
