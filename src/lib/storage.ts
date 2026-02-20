@@ -15,7 +15,8 @@ export const loadSettings = (): Settings => {
       selectedModel: 'unsloth/gemma-3-27b-it',
       selectedImageModel: 'z-image-turbo',
       selectedVisionModel: '',
-      selectedVideoResolution: '480p'
+      selectedVideoResolution: '480p',
+      maxAgenticIterations: 3
     }
   }
   try {
@@ -23,6 +24,14 @@ export const loadSettings = (): Settings => {
     // Ensure selectedVideoResolution has a default value
     if (!parsed.selectedVideoResolution) {
       parsed.selectedVideoResolution = '480p'
+    }
+    // Ensure maxAgenticIterations has a default value
+    if (
+      !parsed.maxAgenticIterations ||
+      parsed.maxAgenticIterations < 1 ||
+      parsed.maxAgenticIterations > 10
+    ) {
+      parsed.maxAgenticIterations = 3
     }
     return parsed
   } catch {
@@ -32,7 +41,8 @@ export const loadSettings = (): Settings => {
       selectedModel: 'unsloth/gemma-3-27b-it',
       selectedImageModel: 'z-image-turbo',
       selectedVisionModel: '',
-      selectedVideoResolution: '480p'
+      selectedVideoResolution: '480p',
+      maxAgenticIterations: 3
     }
   }
 }

@@ -65,7 +65,7 @@ export function ConversationList({
     <>
       <ScrollArea className="flex-1">
         <div className="space-y-0.5 p-2">
-          {conversations.map((conversation) => (
+          {conversations.map(conversation => (
             <div
               key={conversation.id}
               className={cn(
@@ -81,21 +81,24 @@ export function ConversationList({
               <MessageSquare className="h-4 w-4 shrink-0 mt-0.5 opacity-70 group-hover:opacity-100 transition-opacity" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate leading-relaxed">
-                  {conversation.title.slice(0, 15)}{conversation.title.length > 15 ? '...' : ''}
+                  {conversation.title.slice(0, 15)}
+                  {conversation.title.length > 15 ? '...' : ''}
                 </p>
               </div>
-              
+
               {(hoveredId === conversation.id || currentConversationId === conversation.id) && (
-                <div className={cn(
-                  "flex gap-0.5 shrink-0",
-                  currentConversationId === conversation.id 
-                    ? "opacity-100" 
-                    : "opacity-0 transition-opacity group-hover:opacity-100"
-                )}>
+                <div
+                  className={cn(
+                    'flex gap-0.5 shrink-0',
+                    currentConversationId === conversation.id
+                      ? 'opacity-100'
+                      : 'opacity-0 transition-opacity group-hover:opacity-100'
+                  )}
+                >
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    onClick={(e) => handleRenameClick(conversation, e)}
+                    onClick={e => handleRenameClick(conversation, e)}
                     className="h-6 w-6 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground"
                   >
                     <Edit2 className="h-3 w-3" />
@@ -103,7 +106,7 @@ export function ConversationList({
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    onClick={(e) => handleDeleteClick(conversation.id, e)}
+                    onClick={e => handleDeleteClick(conversation.id, e)}
                     className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -112,7 +115,7 @@ export function ConversationList({
               )}
             </div>
           ))}
-          
+
           {conversations.length === 0 && (
             <div className="py-8 text-center">
               <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
@@ -129,11 +132,13 @@ export function ConversationList({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title" className="text-xs">Title</Label>
+              <Label htmlFor="title" className="text-xs">
+                Title
+              </Label>
               <Input
                 id="title"
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={e => setNewTitle(e.target.value)}
                 placeholder="Conversation title"
                 onKeyDown={handleKeyDown}
                 autoFocus
@@ -142,7 +147,11 @@ export function ConversationList({
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setRenameDialogOpen(false)} className="text-xs">
+            <Button
+              variant="outline"
+              onClick={() => setRenameDialogOpen(false)}
+              className="text-xs"
+            >
               Cancel
             </Button>
             <Button onClick={handleRenameSave} disabled={!newTitle.trim()} className="text-xs">

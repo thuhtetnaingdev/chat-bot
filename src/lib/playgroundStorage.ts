@@ -26,7 +26,7 @@ function openDatabase(): Promise<IDBDatabase> {
       resolve(dbInstance)
     }
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = event => {
       const db = (event.target as IDBOpenDBRequest).result
 
       if (!db.objectStoreNames.contains(SESSIONS_STORE)) {
@@ -42,7 +42,7 @@ function openDatabase(): Promise<IDBDatabase> {
 
 export async function saveSession(session: PlaygroundSession): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([SESSIONS_STORE], 'readwrite')
     const store = transaction.objectStore(SESSIONS_STORE)
@@ -55,7 +55,7 @@ export async function saveSession(session: PlaygroundSession): Promise<void> {
 
 export async function loadSession(id: string): Promise<PlaygroundSession | null> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([SESSIONS_STORE], 'readonly')
     const store = transaction.objectStore(SESSIONS_STORE)
@@ -68,7 +68,7 @@ export async function loadSession(id: string): Promise<PlaygroundSession | null>
 
 export async function loadAllSessions(): Promise<PlaygroundSession[]> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([SESSIONS_STORE], 'readonly')
     const store = transaction.objectStore(SESSIONS_STORE)
@@ -85,7 +85,7 @@ export async function loadAllSessions(): Promise<PlaygroundSession[]> {
 
 export async function deleteSession(id: string): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([SESSIONS_STORE, METADATA_STORE], 'readwrite')
     const store = transaction.objectStore(SESSIONS_STORE)
@@ -98,7 +98,7 @@ export async function deleteSession(id: string): Promise<void> {
 
 export async function getActiveSessionId(): Promise<string | null> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([METADATA_STORE], 'readonly')
     const store = transaction.objectStore(METADATA_STORE)
@@ -111,13 +111,11 @@ export async function getActiveSessionId(): Promise<string | null> {
 
 export async function setActiveSessionId(id: string | null): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([METADATA_STORE], 'readwrite')
     const store = transaction.objectStore(METADATA_STORE)
-    const request = id 
-      ? store.put(id, ACTIVE_SESSION_KEY)
-      : store.delete(ACTIVE_SESSION_KEY)
+    const request = id ? store.put(id, ACTIVE_SESSION_KEY) : store.delete(ACTIVE_SESSION_KEY)
 
     request.onsuccess = () => resolve()
     request.onerror = () => reject(new Error('Failed to set active session ID'))
@@ -126,12 +124,12 @@ export async function setActiveSessionId(id: string | null): Promise<void> {
 
 export async function clearAllSessions(): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([SESSIONS_STORE, METADATA_STORE], 'readwrite')
     const sessionsStore = transaction.objectStore(SESSIONS_STORE)
     const metadataStore = transaction.objectStore(METADATA_STORE)
-    
+
     sessionsStore.clear()
     metadataStore.delete(ACTIVE_SESSION_KEY)
 

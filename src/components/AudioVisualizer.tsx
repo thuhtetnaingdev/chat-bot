@@ -9,9 +9,9 @@ interface AudioVisualizerProps {
   className?: string
 }
 
-export function AudioVisualizer({ 
-  audioData, 
-  isActive, 
+export function AudioVisualizer({
+  audioData,
+  isActive,
   barCount = 32,
   barColor = 'var(--primary)',
   className
@@ -44,7 +44,7 @@ export function AudioVisualizer({
       const actualBarWidth = barWidth - gap
 
       for (let i = 0; i < barCount; i++) {
-        const dataIndex = Math.floor(i * audioData.length / barCount)
+        const dataIndex = Math.floor((i * audioData.length) / barCount)
         const value = audioData[dataIndex] || 0
         const barHeight = (value / 255) * canvas.height
 
@@ -69,12 +69,5 @@ export function AudioVisualizer({
     }
   }, [audioData, isActive, barCount, barColor])
 
-  return (
-    <canvas
-      ref={canvasRef}
-      width={320}
-      height={40}
-      className={cn('w-full h-10', className)}
-    />
-  )
+  return <canvas ref={canvasRef} width={320} height={40} className={cn('w-full h-10', className)} />
 }

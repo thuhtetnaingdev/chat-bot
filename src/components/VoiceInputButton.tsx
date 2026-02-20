@@ -11,8 +11,8 @@ interface VoiceInputButtonProps {
   recordingDuration?: number
 }
 
-export function VoiceInputButton({ 
-  isRecording, 
+export function VoiceInputButton({
+  isRecording,
   isTranscribing,
   onStartRecording,
   onStopRecording,

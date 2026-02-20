@@ -34,7 +34,7 @@ function openDatabase(): Promise<IDBDatabase> {
       resolve(dbInstance)
     }
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = event => {
       const db = (event.target as IDBOpenDBRequest).result
 
       // Create conversations store
@@ -57,9 +57,9 @@ function openDatabase(): Promise<IDBDatabase> {
  */
 async function compressConversationImages(conversation: Conversation): Promise<Conversation> {
   const compressedMessages = await Promise.all(
-    conversation.messages.map(async (msg) => {
+    conversation.messages.map(async msg => {
       const compressedMsg = { ...msg }
-      
+
       if (msg.images && msg.images.length > 0) {
         try {
           compressedMsg.images = await compressImages(msg.images)
@@ -68,7 +68,7 @@ async function compressConversationImages(conversation: Conversation): Promise<C
           compressedMsg.images = msg.images
         }
       }
-      
+
       if (msg.generatedImages && msg.generatedImages.length > 0) {
         try {
           compressedMsg.generatedImages = await compressImages(msg.generatedImages)
@@ -76,16 +76,16 @@ async function compressConversationImages(conversation: Conversation): Promise<C
           compressedMsg.generatedImages = msg.generatedImages
         }
       }
-      
+
       // Videos remain excluded (too large)
       if (msg.generatedVideos) {
         delete compressedMsg.generatedVideos
       }
-      
+
       return compressedMsg
     })
   )
-  
+
   return {
     ...conversation,
     messages: compressedMessages
@@ -98,7 +98,7 @@ async function compressConversationImages(conversation: Conversation): Promise<C
 export async function saveConversation(conversation: Conversation): Promise<void> {
   const db = await openDatabase()
   const compressed = await compressConversationImages(conversation)
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CONVERSATIONS_STORE], 'readwrite')
     const store = transaction.objectStore(CONVERSATIONS_STORE)
@@ -114,20 +114,20 @@ export async function saveConversation(conversation: Conversation): Promise<void
  */
 export async function saveConversations(conversations: Conversation[]): Promise<void> {
   const db = await openDatabase()
-  
+
   // Compress all conversations first
   const compressedConversations = await Promise.all(
     conversations.map(conv => compressConversationImages(conv))
   )
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CONVERSATIONS_STORE], 'readwrite')
     const store = transaction.objectStore(CONVERSATIONS_STORE)
-    
+
     for (const conversation of compressedConversations) {
       store.put(conversation)
     }
-    
+
     transaction.oncomplete = () => resolve()
     transaction.onerror = () => reject(new Error('Failed to save conversations'))
   })
@@ -138,7 +138,7 @@ export async function saveConversations(conversations: Conversation[]): Promise<
  */
 export async function loadConversations(): Promise<Conversation[]> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CONVERSATIONS_STORE], 'readonly')
     const store = transaction.objectStore(CONVERSATIONS_STORE)
@@ -159,7 +159,7 @@ export async function loadConversations(): Promise<Conversation[]> {
  */
 export async function loadConversation(id: string): Promise<Conversation | null> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CONVERSATIONS_STORE], 'readonly')
     const store = transaction.objectStore(CONVERSATIONS_STORE)
@@ -175,7 +175,7 @@ export async function loadConversation(id: string): Promise<Conversation | null>
  */
 export async function deleteConversation(id: string): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CONVERSATIONS_STORE], 'readwrite')
     const store = transaction.objectStore(CONVERSATIONS_STORE)
@@ -191,7 +191,7 @@ export async function deleteConversation(id: string): Promise<void> {
  */
 export async function clearAllConversations(): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([CONVERSATIONS_STORE], 'readwrite')
     const store = transaction.objectStore(CONVERSATIONS_STORE)
@@ -207,7 +207,7 @@ export async function clearAllConversations(): Promise<void> {
  */
 export async function getActiveConversationId(): Promise<string | null> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([METADATA_STORE], 'readonly')
     const store = transaction.objectStore(METADATA_STORE)
@@ -223,11 +223,11 @@ export async function getActiveConversationId(): Promise<string | null> {
  */
 export async function setActiveConversationId(id: string | null): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([METADATA_STORE], 'readwrite')
     const store = transaction.objectStore(METADATA_STORE)
-    const request = id 
+    const request = id
       ? store.put(id, ACTIVE_CONVERSATION_KEY)
       : store.delete(ACTIVE_CONVERSATION_KEY)
 
@@ -241,7 +241,7 @@ export async function setActiveConversationId(id: string | null): Promise<void> 
  */
 async function isMigrationComplete(): Promise<boolean> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([METADATA_STORE], 'readonly')
     const store = transaction.objectStore(METADATA_STORE)
@@ -257,7 +257,7 @@ async function isMigrationComplete(): Promise<boolean> {
  */
 async function setMigrationComplete(): Promise<void> {
   const db = await openDatabase()
-  
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([METADATA_STORE], 'readwrite')
     const store = transaction.objectStore(METADATA_STORE)
@@ -296,13 +296,13 @@ export async function migrateFromLocalStorage(): Promise<boolean> {
 
     // Migrate to IndexedDB (with image compression)
     await saveConversations(conversations)
-    
+
     // Clear localStorage conversations (keep settings)
     localStorage.removeItem(LEGACY_CONVERSATIONS_KEY)
-    
+
     // Mark migration complete
     await setMigrationComplete()
-    
+
     console.log(`Migrated ${conversations.length} conversations to IndexedDB`)
     return true
   } catch (error) {
@@ -323,10 +323,10 @@ export async function initializeStorage(): Promise<{
   try {
     // Try to open database
     await openDatabase()
-    
+
     // Attempt migration
     const migrated = await migrateFromLocalStorage()
-    
+
     return { available: true, migrated }
   } catch (error) {
     console.error('IndexedDB not available:', error)

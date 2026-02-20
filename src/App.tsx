@@ -6,7 +6,13 @@ import { ChatContainer } from './components/ChatContainer'
 import { ChatInput } from './components/ChatInput'
 import { PromptPlayground } from './components/PromptPlayground'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Settings, Menu, X, Loader2 } from 'lucide-react'
 import { fetchModels } from './lib/api'
 import { type Model } from './types'
@@ -14,7 +20,7 @@ import { cn } from '@/lib/utils'
 
 function App() {
   const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings()
-  
+
   const [showSettings, setShowSettings] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [showLab, setShowLab] = useState(false)
@@ -40,7 +46,7 @@ function App() {
 
   const loadModels = useCallback(async () => {
     if (modelsLoadedRef.current) return
-    
+
     setIsLoadingModels(true)
     try {
       const fetchedModels = await fetchModels()
@@ -86,9 +92,25 @@ function App() {
     )
   }
 
-  const handleSendMessage = async (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string, videoResolution?: string) => {
+  const handleSendMessage = async (
+    message: string,
+    images?: string[],
+    activeTool?: string,
+    visionModel?: string,
+    imageModel?: string,
+    videoResolution?: string,
+    maxAgenticIterations?: number
+  ) => {
     setIsThinking(true)
-    await sendMessage(message, images, activeTool, visionModel, imageModel, videoResolution)
+    await sendMessage(
+      message,
+      images,
+      activeTool,
+      visionModel,
+      imageModel,
+      videoResolution,
+      maxAgenticIterations
+    )
     setIsThinking(false)
   }
 
@@ -123,7 +145,7 @@ function App() {
             setShowSidebar(false)
             setShowLab(false)
           }}
-          onSelectConversation={(id) => {
+          onSelectConversation={id => {
             selectConversation(id)
             setShowSidebar(false)
             setShowLab(false)
@@ -147,11 +169,16 @@ function App() {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          
-          <h1 className={cn('truncate font-semibold tracking-tight flex-1 min-w-0', 'text-sm sm:text-base md:text-lg')}>
+
+          <h1
+            className={cn(
+              'truncate font-semibold tracking-tight flex-1 min-w-0',
+              'text-sm sm:text-base md:text-lg'
+            )}
+          >
             {showLab ? 'Prompt Playground' : currentConversation?.title || 'New Chat'}
           </h1>
-          
+
           <div className="flex items-center gap-2 shrink-0">
             {isLoadingModels ? (
               <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
@@ -161,13 +188,13 @@ function App() {
             ) : models.length > 0 ? (
               <Select
                 value={settings.selectedModel}
-                onValueChange={(value) => updateSettings({ selectedModel: value })}
+                onValueChange={value => updateSettings({ selectedModel: value })}
               >
                 <SelectTrigger className="w-[120px] sm:w-[160px] md:w-[200px] lg:w-[260px] h-8 sm:h-9 text-[10px] sm:text-xs">
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
-                  {models.map((model) => (
+                  {models.map(model => (
                     <SelectItem key={model.id} value={model.id}>
                       <div className="flex flex-col">
                         <span className="font-medium text-xs">{model.name}</span>
@@ -203,7 +230,7 @@ function App() {
           <PromptPlayground
             apiKey={settings.apiKey}
             selectedModel={settings.selectedModel}
-            onModelChange={(value) => updateSettings({ selectedModel: value })}
+            onModelChange={value => updateSettings({ selectedModel: value })}
             models={models}
             selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
           />
@@ -225,11 +252,15 @@ function App() {
               apiKey={settings.apiKey}
               isThinking={isThinking}
               selectedImageModel={settings.selectedImageModel || 'z-image-turbo'}
-              onImageModelChange={(value) => updateSettings({ selectedImageModel: value })}
+              onImageModelChange={value => updateSettings({ selectedImageModel: value })}
               selectedVisionModel={settings.selectedVisionModel}
-              onVisionModelChange={(value) => updateSettings({ selectedVisionModel: value })}
+              onVisionModelChange={value => updateSettings({ selectedVisionModel: value })}
               selectedVideoResolution={settings.selectedVideoResolution || '480p'}
-              onVideoResolutionChange={(value) => updateSettings({ selectedVideoResolution: value })}
+              onVideoResolutionChange={value => updateSettings({ selectedVideoResolution: value })}
+              maxAgenticIterations={settings.maxAgenticIterations || 3}
+              onMaxAgenticIterationsChange={value =>
+                updateSettings({ maxAgenticIterations: value })
+              }
               models={models}
             />
           </>
@@ -254,13 +285,15 @@ function App() {
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chutes API Key</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Chutes API Key
+                </label>
                 <input
                   type="password"
                   className="w-full rounded-md border border-border/50 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:ring-offset-0 transition-all"
                   placeholder="Enter your Chutes API key"
                   value={settings.apiKey}
-                  onChange={(e) => {
+                  onChange={e => {
                     updateSettings({ apiKey: e.target.value })
                     if (e.target.value && !modelsLoadedRef.current) {
                       setIsLoadingModels(true)
@@ -270,8 +303,7 @@ function App() {
                           console.log('Settings dialog loaded models:', fetchedModels)
                           setModels(fetchedModels)
                         })
-                        .catch(() => {
-                        })
+                        .catch(() => {})
                         .finally(() => {
                           setIsLoadingModels(false)
                         })
@@ -284,12 +316,14 @@ function App() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">System Instructions</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  System Instructions
+                </label>
                 <textarea
                   className="w-full min-h-[100px] rounded-md border border-border/50 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:ring-offset-0 resize-none transition-all"
                   placeholder="Add custom instructions for the AI assistant..."
                   value={settings.instructions}
-                  onChange={(e) => updateSettings({ instructions: e.target.value })}
+                  onChange={e => updateSettings({ instructions: e.target.value })}
                   rows={4}
                 />
                 <p className="text-[10px] text-muted-foreground/70">
@@ -298,7 +332,9 @@ function App() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Default Model</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Default Model
+                </label>
                 {isLoadingModels ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -307,13 +343,13 @@ function App() {
                 ) : models.length > 0 ? (
                   <Select
                     value={settings.selectedModel}
-                    onValueChange={(value) => updateSettings({ selectedModel: value })}
+                    onValueChange={value => updateSettings({ selectedModel: value })}
                   >
                     <SelectTrigger className="text-sm">
                       <SelectValue placeholder="Select default model" />
                     </SelectTrigger>
                     <SelectContent>
-                      {models.map((model) => (
+                      {models.map(model => (
                         <SelectItem key={model.id} value={model.id}>
                           <div className="flex flex-col">
                             <span className="font-medium text-xs">{model.name}</span>
@@ -335,7 +371,11 @@ function App() {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setShowSettings(false)} className="text-xs">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSettings(false)}
+                  className="text-xs"
+                >
                   Cancel
                 </Button>
                 <Button onClick={() => setShowSettings(false)} className="text-xs">

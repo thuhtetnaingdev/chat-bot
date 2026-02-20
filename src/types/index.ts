@@ -57,7 +57,8 @@ export const availableTools: Tool[] = [
   {
     id: 'agentic_video',
     name: 'Agentic Video',
-    description: 'Generate videos with automatic quality verification and iterative refinement using vision models',
+    description:
+      'Generate videos with automatic quality verification and iterative refinement using vision models',
     icon: 'clapperboard',
     pattern: '@agentic_video'
   }
@@ -69,6 +70,30 @@ export interface VisionVerification {
   satisfied: boolean
   issues: string[]
   suggestedEdit: string
+  recommendedStrategy?: 'fresh' | 'progressive' | 'targeted'
+}
+
+// Image Analysis types for intelligent editing
+export interface FaceInfo {
+  id: number
+  location: string
+  description: string
+}
+
+export interface ClothingInfo {
+  item: string
+  color: string
+  location: string
+}
+
+export interface ImageAnalysis {
+  hasFaces: boolean
+  faces: FaceInfo[]
+  clothing: ClothingInfo[]
+  background: string
+  keyObjects: string[]
+  totalElements: number
+  preservationInstructions: string
 }
 
 export interface AgenticIteration {
@@ -76,6 +101,7 @@ export interface AgenticIteration {
   image: string
   editPrompt: string
   visionFeedback: VisionVerification
+  imageAnalysis?: ImageAnalysis
 }
 
 export interface AgenticVideoIteration {
@@ -98,6 +124,7 @@ export interface Message {
   toolStatus?: ToolStatus // Status of tool execution
   agenticIterations?: AgenticIteration[] // Iterations from agentic image generation
   agenticVideoIterations?: AgenticVideoIteration[] // Iterations from agentic video generation
+  imageAnalysis?: ImageAnalysis // Analysis results for display (agentic_image/video)
 }
 
 export interface Conversation {
@@ -109,11 +136,27 @@ export interface Conversation {
 }
 
 export const IMAGE_MODELS = [
-  { id: 'z-image-turbo', name: 'Z Image Turbo', url: 'https://chutes-z-image-turbo.chutes.ai/generate' },
-  { id: 'Qwen-Image-2512', name: 'Qwen Image 2512', url: 'https://chutes-qwen-image-2512.chutes.ai/generate' },
+  {
+    id: 'z-image-turbo',
+    name: 'Z Image Turbo',
+    url: 'https://chutes-z-image-turbo.chutes.ai/generate'
+  },
+  {
+    id: 'Qwen-Image-2512',
+    name: 'Qwen Image 2512',
+    url: 'https://chutes-qwen-image-2512.chutes.ai/generate'
+  },
   { id: 'chroma', name: 'Chroma', url: 'https://chutes-chroma.chutes.ai/generate' },
-  { id: 'hunyuan-image-3', name: 'Hunyuan Image 3', url: 'https://chutes-hunyuan-image-3.chutes.ai/generate' },
-  { id: 'FLUX.1-schnell', name: 'FLUX.1 Schnell', url: 'https://chutes-flux-1-schnell.chutes.ai/generate' },
+  {
+    id: 'hunyuan-image-3',
+    name: 'Hunyuan Image 3',
+    url: 'https://chutes-hunyuan-image-3.chutes.ai/generate'
+  },
+  {
+    id: 'FLUX.1-schnell',
+    name: 'FLUX.1 Schnell',
+    url: 'https://chutes-flux-1-schnell.chutes.ai/generate'
+  },
   { id: 'HassakuXL', name: 'HassakuXL', url: 'https://chutes-hassakuxl.chutes.ai/generate' },
   { id: 'iLustMix', name: 'iLustMix', url: 'https://chutes-ilustmix.chutes.ai/generate' }
 ] as const
@@ -130,6 +173,7 @@ export interface Settings {
   selectedImageModel: string
   selectedVisionModel: string
   selectedVideoResolution: string
+  maxAgenticIterations: number
 }
 
 export interface Model {

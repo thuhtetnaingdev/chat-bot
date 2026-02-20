@@ -108,33 +108,39 @@ export function usePlayground(
     await setActiveSessionId(newSession.id)
     setSessions(prev => [newSession, ...prev])
     setActiveSession(newSession)
-    
+
     return newSession
   }, [sessions])
 
-  const selectSession = useCallback(async (id: string) => {
-    const session = sessions.find(s => s.id === id)
-    if (session) {
-      await setActiveSessionId(id)
-      setActiveSession(session)
-    }
-  }, [sessions])
-
-  const deleteSessionById = useCallback(async (id: string) => {
-    await deleteSessionFromStorage(id)
-    setSessions(prev => prev.filter(s => s.id !== id))
-
-    if (activeSession?.id === id) {
-      const remaining = sessions.filter(s => s.id !== id)
-      if (remaining.length > 0) {
-        await setActiveSessionId(remaining[0].id)
-        setActiveSession(remaining[0])
-      } else {
-        await setActiveSessionId(null)
-        setActiveSession(null)
+  const selectSession = useCallback(
+    async (id: string) => {
+      const session = sessions.find(s => s.id === id)
+      if (session) {
+        await setActiveSessionId(id)
+        setActiveSession(session)
       }
-    }
-  }, [sessions, activeSession])
+    },
+    [sessions]
+  )
+
+  const deleteSessionById = useCallback(
+    async (id: string) => {
+      await deleteSessionFromStorage(id)
+      setSessions(prev => prev.filter(s => s.id !== id))
+
+      if (activeSession?.id === id) {
+        const remaining = sessions.filter(s => s.id !== id)
+        if (remaining.length > 0) {
+          await setActiveSessionId(remaining[0].id)
+          setActiveSession(remaining[0])
+        } else {
+          await setActiveSessionId(null)
+          setActiveSession(null)
+        }
+      }
+    },
+    [sessions, activeSession]
+  )
 
   const updateActiveSession = useCallback((updates: Partial<PlaygroundSession>) => {
     setActiveSession(prev => {
@@ -167,310 +173,331 @@ export function usePlayground(
     return newVariant
   }, [activeSession, updateActiveSession, selectedImageModel])
 
-  const updateVariant = useCallback((id: string, updates: Partial<PromptVariant>) => {
-    if (!activeSession) return
+  const updateVariant = useCallback(
+    (id: string, updates: Partial<PromptVariant>) => {
+      if (!activeSession) return
 
-    const variants = activeSession.variants.map(v => 
-      v.id === id ? { ...v, ...updates } : v
-    )
+      const variants = activeSession.variants.map(v => (v.id === id ? { ...v, ...updates } : v))
 
-    const allDetectedVariables: PromptVariable[] = []
-    for (const variant of variants) {
-      const detected = detectVariables(variant.prompt)
-      for (const v of detected) {
-        if (!allDetectedVariables.find(av => av.name === v.name)) {
-          allDetectedVariables.push(v)
+      const allDetectedVariables: PromptVariable[] = []
+      for (const variant of variants) {
+        const detected = detectVariables(variant.prompt)
+        for (const v of detected) {
+          if (!allDetectedVariables.find(av => av.name === v.name)) {
+            allDetectedVariables.push(v)
+          }
         }
       }
-    }
 
-    const mergedVariables = mergeVariables(activeSession.variables, allDetectedVariables)
+      const mergedVariables = mergeVariables(activeSession.variables, allDetectedVariables)
 
-    updateActiveSession({ variants, variables: mergedVariables })
-  }, [activeSession, updateActiveSession])
+      updateActiveSession({ variants, variables: mergedVariables })
+    },
+    [activeSession, updateActiveSession]
+  )
 
-  const removeVariant = useCallback((id: string) => {
-    if (!activeSession) return
+  const removeVariant = useCallback(
+    (id: string) => {
+      if (!activeSession) return
 
-    updateActiveSession({
-      variants: activeSession.variants.filter(v => v.id !== id),
-      runs: activeSession.runs.filter(r => r.variantId !== id)
-    })
-  }, [activeSession, updateActiveSession])
-
-  const updateVariableValue = useCallback((name: string, value: string) => {
-    if (!activeSession) return
-
-    const variables = activeSession.variables.map(v =>
-      v.name === name ? { ...v, currentValue: value } : v
-    )
-
-    updateActiveSession({ variables })
-  }, [activeSession, updateActiveSession])
-
-  const setTestInput = useCallback((input: string) => {
-    updateActiveSession({ testInput: input })
-  }, [updateActiveSession])
-
-  const calculateMetrics = useCallback((
-    inputTokens: number,
-    outputTokens: number,
-    responseTimeMs: number
-  ): RunMetrics => {
-    const totalTokens = inputTokens + outputTokens
-    const model = models.find(m => m.id === selectedModel)
-    const costPerToken = (model?.cost || 0) / 1_000_000
-    const cost = totalTokens * costPerToken
-
-    return {
-      inputTokens,
-      outputTokens,
-      totalTokens,
-      cost,
-      responseTimeMs
-    }
-  }, [models, selectedModel])
-
-  const runVariant = useCallback(async (variantId: string, testInput?: string) => {
-    if (!activeSession || !apiKey || isRunning) return
-
-    const variant = activeSession.variants.find(v => v.id === variantId)
-    if (!variant || !variant.prompt.trim()) return
-
-    const finalPrompt = interpolatePrompt(variant.prompt, activeSession.variables)
-    const actualInput = testInput || activeSession.testInput || ''
-
-    const fullPrompt = actualInput 
-      ? `${finalPrompt}\n\nInput: ${actualInput}`
-      : finalPrompt
-
-    setRunningVariantIds(prev => [...prev, variantId])
-    setStreamingOutput(prev => ({ ...prev, [variantId]: '' }))
-
-    const startTime = Date.now()
-
-    try {
-      if (activeSession.type === 'image') {
-        const imageModel = variant.imageModel || selectedImageModel
-        const output = await generateImage(fullPrompt, apiKey, imageModel)
-
-        const responseTimeMs = Date.now() - startTime
-        const metrics: RunMetrics = {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-          cost: 0,
-          responseTimeMs
-        }
-
-        const run: TestRun = {
-          id: crypto.randomUUID(),
-          variantId,
-          testCaseId: null,
-          model: imageModel,
-          output,
-          outputType: 'image',
-          metrics,
-          rating: 0,
-          notes: '',
-          timestamp: Date.now()
-        }
-
-        setActiveSession(prev => {
-          if (!prev) return null
-          const existingRunIndex = prev.runs.findIndex(
-            r => r.variantId === variantId && r.testCaseId === null
-          )
-          const runs = [...prev.runs]
-          if (existingRunIndex >= 0) {
-            runs[existingRunIndex] = run
-          } else {
-            runs.push(run)
-          }
-          return {
-            ...prev,
-            runs,
-            updatedAt: Date.now()
-          }
-        })
-      } else if (activeSession.type === 'edit') {
-        if (!activeSession.editImage) {
-          throw new Error('Please upload an image to edit')
-        }
-        
-        const output = await editImage(fullPrompt, [activeSession.editImage], apiKey)
-
-        const responseTimeMs = Date.now() - startTime
-        const metrics: RunMetrics = {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-          cost: 0,
-          responseTimeMs
-        }
-
-        const run: TestRun = {
-          id: crypto.randomUUID(),
-          variantId,
-          testCaseId: null,
-          model: 'qwen-image-edit',
-          output,
-          outputType: 'image',
-          inputImage: activeSession.editImage,
-          metrics,
-          rating: 0,
-          notes: '',
-          timestamp: Date.now()
-        }
-
-        setActiveSession(prev => {
-          if (!prev) return null
-          const existingRunIndex = prev.runs.findIndex(
-            r => r.variantId === variantId && r.testCaseId === null
-          )
-          const runs = [...prev.runs]
-          if (existingRunIndex >= 0) {
-            runs[existingRunIndex] = run
-          } else {
-            runs.push(run)
-          }
-          return {
-            ...prev,
-            runs,
-            updatedAt: Date.now()
-          }
-        })
-      } else {
-        const messages: ChatMessage[] = [
-          {
-            role: 'user',
-            content: fullPrompt
-          }
-        ]
-
-        let output = ''
-
-        await chatWithLLM(
-          messages,
-          apiKey,
-          selectedModel,
-          (chunk) => {
-            output += chunk
-            setStreamingOutput(prev => ({ ...prev, [variantId]: output }))
-          },
-          undefined,
-          2048
-        )
-
-        const responseTimeMs = Date.now() - startTime
-        const inputTokens = estimateTokens(fullPrompt)
-        const outputTokens = estimateTokens(output)
-        const metrics = calculateMetrics(inputTokens, outputTokens, responseTimeMs)
-
-        const run: TestRun = {
-          id: crypto.randomUUID(),
-          variantId,
-          testCaseId: null,
-          model: selectedModel,
-          output,
-          outputType: 'text',
-          metrics,
-          rating: 0,
-          notes: '',
-          timestamp: Date.now()
-        }
-
-        setActiveSession(prev => {
-          if (!prev) return null
-          const existingRunIndex = prev.runs.findIndex(
-            r => r.variantId === variantId && r.testCaseId === null
-          )
-          const runs = [...prev.runs]
-          if (existingRunIndex >= 0) {
-            runs[existingRunIndex] = run
-          } else {
-            runs.push(run)
-          }
-          return {
-            ...prev,
-            runs,
-            updatedAt: Date.now()
-          }
-        })
-      }
-    } catch (error) {
-      console.error('Failed to run variant:', error)
-    } finally {
-      setRunningVariantIds(prev => prev.filter(id => id !== variantId))
-      setStreamingOutput(prev => {
-        const next = { ...prev }
-        delete next[variantId]
-        return next
+      updateActiveSession({
+        variants: activeSession.variants.filter(v => v.id !== id),
+        runs: activeSession.runs.filter(r => r.variantId !== id)
       })
-    }
-  }, [activeSession, apiKey, isRunning, selectedModel, selectedImageModel, calculateMetrics])
+    },
+    [activeSession, updateActiveSession]
+  )
 
-  const runAllVariants = useCallback(async (testInput?: string) => {
-    if (!activeSession || isRunning) return
+  const updateVariableValue = useCallback(
+    (name: string, value: string) => {
+      if (!activeSession) return
 
-    const variantsToRun = activeSession.variants.filter(v => v.prompt.trim())
-    if (variantsToRun.length === 0) return
+      const variables = activeSession.variables.map(v =>
+        v.name === name ? { ...v, currentValue: value } : v
+      )
 
-    setIsRunning(true)
+      updateActiveSession({ variables })
+    },
+    [activeSession, updateActiveSession]
+  )
 
-    for (const variant of variantsToRun) {
-      await runVariant(variant.id, testInput)
-    }
+  const setTestInput = useCallback(
+    (input: string) => {
+      updateActiveSession({ testInput: input })
+    },
+    [updateActiveSession]
+  )
 
-    setIsRunning(false)
-  }, [activeSession, isRunning, runVariant])
+  const calculateMetrics = useCallback(
+    (inputTokens: number, outputTokens: number, responseTimeMs: number): RunMetrics => {
+      const totalTokens = inputTokens + outputTokens
+      const model = models.find(m => m.id === selectedModel)
+      const costPerToken = (model?.cost || 0) / 1_000_000
+      const cost = totalTokens * costPerToken
 
-  const updateRunRating = useCallback((runId: string, rating: number) => {
-    if (!activeSession) return
+      return {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        cost,
+        responseTimeMs
+      }
+    },
+    [models, selectedModel]
+  )
 
-    const runs = activeSession.runs.map(r =>
-      r.id === runId ? { ...r, rating } : r
-    )
+  const runVariant = useCallback(
+    async (variantId: string, testInput?: string) => {
+      if (!activeSession || !apiKey || isRunning) return
 
-    updateActiveSession({ runs })
-  }, [activeSession, updateActiveSession])
+      const variant = activeSession.variants.find(v => v.id === variantId)
+      if (!variant || !variant.prompt.trim()) return
 
-  const updateRunNotes = useCallback((runId: string, notes: string) => {
-    if (!activeSession) return
+      const finalPrompt = interpolatePrompt(variant.prompt, activeSession.variables)
+      const actualInput = testInput || activeSession.testInput || ''
 
-    const runs = activeSession.runs.map(r =>
-      r.id === runId ? { ...r, notes } : r
-    )
+      const fullPrompt = actualInput ? `${finalPrompt}\n\nInput: ${actualInput}` : finalPrompt
 
-    updateActiveSession({ runs })
-  }, [activeSession, updateActiveSession])
+      setRunningVariantIds(prev => [...prev, variantId])
+      setStreamingOutput(prev => ({ ...prev, [variantId]: '' }))
+
+      const startTime = Date.now()
+
+      try {
+        if (activeSession.type === 'image') {
+          const imageModel = variant.imageModel || selectedImageModel
+          const output = await generateImage(fullPrompt, apiKey, imageModel)
+
+          const responseTimeMs = Date.now() - startTime
+          const metrics: RunMetrics = {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            cost: 0,
+            responseTimeMs
+          }
+
+          const run: TestRun = {
+            id: crypto.randomUUID(),
+            variantId,
+            testCaseId: null,
+            model: imageModel,
+            output,
+            outputType: 'image',
+            metrics,
+            rating: 0,
+            notes: '',
+            timestamp: Date.now()
+          }
+
+          setActiveSession(prev => {
+            if (!prev) return null
+            const existingRunIndex = prev.runs.findIndex(
+              r => r.variantId === variantId && r.testCaseId === null
+            )
+            const runs = [...prev.runs]
+            if (existingRunIndex >= 0) {
+              runs[existingRunIndex] = run
+            } else {
+              runs.push(run)
+            }
+            return {
+              ...prev,
+              runs,
+              updatedAt: Date.now()
+            }
+          })
+        } else if (activeSession.type === 'edit') {
+          if (!activeSession.editImage) {
+            throw new Error('Please upload an image to edit')
+          }
+
+          const output = await editImage(fullPrompt, [activeSession.editImage], apiKey)
+
+          const responseTimeMs = Date.now() - startTime
+          const metrics: RunMetrics = {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            cost: 0,
+            responseTimeMs
+          }
+
+          const run: TestRun = {
+            id: crypto.randomUUID(),
+            variantId,
+            testCaseId: null,
+            model: 'qwen-image-edit',
+            output,
+            outputType: 'image',
+            inputImage: activeSession.editImage,
+            metrics,
+            rating: 0,
+            notes: '',
+            timestamp: Date.now()
+          }
+
+          setActiveSession(prev => {
+            if (!prev) return null
+            const existingRunIndex = prev.runs.findIndex(
+              r => r.variantId === variantId && r.testCaseId === null
+            )
+            const runs = [...prev.runs]
+            if (existingRunIndex >= 0) {
+              runs[existingRunIndex] = run
+            } else {
+              runs.push(run)
+            }
+            return {
+              ...prev,
+              runs,
+              updatedAt: Date.now()
+            }
+          })
+        } else {
+          const messages: ChatMessage[] = [
+            {
+              role: 'user',
+              content: fullPrompt
+            }
+          ]
+
+          let output = ''
+
+          await chatWithLLM(
+            messages,
+            apiKey,
+            selectedModel,
+            chunk => {
+              output += chunk
+              setStreamingOutput(prev => ({ ...prev, [variantId]: output }))
+            },
+            undefined,
+            2048
+          )
+
+          const responseTimeMs = Date.now() - startTime
+          const inputTokens = estimateTokens(fullPrompt)
+          const outputTokens = estimateTokens(output)
+          const metrics = calculateMetrics(inputTokens, outputTokens, responseTimeMs)
+
+          const run: TestRun = {
+            id: crypto.randomUUID(),
+            variantId,
+            testCaseId: null,
+            model: selectedModel,
+            output,
+            outputType: 'text',
+            metrics,
+            rating: 0,
+            notes: '',
+            timestamp: Date.now()
+          }
+
+          setActiveSession(prev => {
+            if (!prev) return null
+            const existingRunIndex = prev.runs.findIndex(
+              r => r.variantId === variantId && r.testCaseId === null
+            )
+            const runs = [...prev.runs]
+            if (existingRunIndex >= 0) {
+              runs[existingRunIndex] = run
+            } else {
+              runs.push(run)
+            }
+            return {
+              ...prev,
+              runs,
+              updatedAt: Date.now()
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Failed to run variant:', error)
+      } finally {
+        setRunningVariantIds(prev => prev.filter(id => id !== variantId))
+        setStreamingOutput(prev => {
+          const next = { ...prev }
+          delete next[variantId]
+          return next
+        })
+      }
+    },
+    [activeSession, apiKey, isRunning, selectedModel, selectedImageModel, calculateMetrics]
+  )
+
+  const runAllVariants = useCallback(
+    async (testInput?: string) => {
+      if (!activeSession || isRunning) return
+
+      const variantsToRun = activeSession.variants.filter(v => v.prompt.trim())
+      if (variantsToRun.length === 0) return
+
+      setIsRunning(true)
+
+      for (const variant of variantsToRun) {
+        await runVariant(variant.id, testInput)
+      }
+
+      setIsRunning(false)
+    },
+    [activeSession, isRunning, runVariant]
+  )
+
+  const updateRunRating = useCallback(
+    (runId: string, rating: number) => {
+      if (!activeSession) return
+
+      const runs = activeSession.runs.map(r => (r.id === runId ? { ...r, rating } : r))
+
+      updateActiveSession({ runs })
+    },
+    [activeSession, updateActiveSession]
+  )
+
+  const updateRunNotes = useCallback(
+    (runId: string, notes: string) => {
+      if (!activeSession) return
+
+      const runs = activeSession.runs.map(r => (r.id === runId ? { ...r, notes } : r))
+
+      updateActiveSession({ runs })
+    },
+    [activeSession, updateActiveSession]
+  )
 
   const clearRuns = useCallback(() => {
     updateActiveSession({ runs: [] })
   }, [updateActiveSession])
 
-  const setEditImage = useCallback((image: string) => {
-    updateActiveSession({ editImage: image })
-  }, [updateActiveSession])
+  const setEditImage = useCallback(
+    (image: string) => {
+      updateActiveSession({ editImage: image })
+    },
+    [updateActiveSession]
+  )
 
   const removeEditImage = useCallback(() => {
     updateActiveSession({ editImage: undefined })
   }, [updateActiveSession])
 
-  const updateSessionType = useCallback((type: SessionType) => {
-    if (!activeSession) return
-    
-    const updatedVariants = activeSession.variants.map(v => ({
-      ...v,
-      imageModel: type === 'image' ? (v.imageModel || selectedImageModel) : v.imageModel
-    }))
+  const updateSessionType = useCallback(
+    (type: SessionType) => {
+      if (!activeSession) return
 
-    updateActiveSession({ 
-      type, 
-      variants: updatedVariants,
-      runs: []
-    })
-  }, [activeSession, updateActiveSession, selectedImageModel])
+      const updatedVariants = activeSession.variants.map(v => ({
+        ...v,
+        imageModel: type === 'image' ? v.imageModel || selectedImageModel : v.imageModel
+      }))
+
+      updateActiveSession({
+        type,
+        variants: updatedVariants,
+        runs: []
+      })
+    },
+    [activeSession, updateActiveSession, selectedImageModel]
+  )
 
   const getBestPrompt = useCallback((): string | null => {
     if (!activeSession) return null

@@ -1,17 +1,46 @@
-import { useState, type KeyboardEvent, type FormEvent, useRef, useEffect, type ChangeEvent } from 'react'
+import {
+  useState,
+  type KeyboardEvent,
+  type FormEvent,
+  useRef,
+  useEffect,
+  type ChangeEvent
+} from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Square, ArrowUp, Paperclip, X, ImageIcon } from 'lucide-react'
 import { useAudioRecorder } from '@/hooks/useAudioRecorder'
 import { useAudioVisualizer } from '@/hooks/useAudioVisualizer'
 import { AudioVisualizer } from '@/components/AudioVisualizer'
 import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
-import { availableTools, type Tool, IMAGE_MODELS, VIDEO_RESOLUTIONS, type Model, supportsVideo } from '@/types'
+import {
+  availableTools,
+  type Tool,
+  IMAGE_MODELS,
+  VIDEO_RESOLUTIONS,
+  type Model,
+  supportsVideo
+} from '@/types'
 
 export interface ChatInputProps {
-  onSend: (message: string, images?: string[], activeTool?: string, visionModel?: string, imageModel?: string, videoResolution?: string) => Promise<void>
+  onSend: (
+    message: string,
+    images?: string[],
+    activeTool?: string,
+    visionModel?: string,
+    imageModel?: string,
+    videoResolution?: string,
+    maxAgenticIterations?: number
+  ) => Promise<void>
   onStop: () => void
   isStreaming: boolean
   disabled?: boolean
@@ -23,6 +52,8 @@ export interface ChatInputProps {
   onVisionModelChange?: (model: string) => void
   selectedVideoResolution?: string
   onVideoResolutionChange?: (resolution: string) => void
+  maxAgenticIterations?: number
+  onMaxAgenticIterationsChange?: (value: number) => void
   models?: Model[]
 }
 
@@ -38,6 +69,8 @@ export function ChatInput({
   onVisionModelChange,
   selectedVideoResolution = '480p',
   onVideoResolutionChange,
+  maxAgenticIterations = 3,
+  onMaxAgenticIterationsChange,
   models = []
 }: ChatInputProps) {
   const [input, setInput] = useState('')
@@ -76,12 +109,12 @@ export function ChatInput({
       if (audioBlob && apiKey && !isTranscribing) {
         // Create unique identifier for this blob
         const blobId = `${audioBlob.size}-${audioBlob.type}-${Date.now()}`
-        
+
         // Skip if already processed
         if (processedBlobRef.current === blobId) {
           return
         }
-        
+
         processedBlobRef.current = blobId
         setIsTranscribing(true)
         setTranscriptionError(null)
@@ -109,13 +142,20 @@ export function ChatInput({
   const visionModels = models.filter(m => m.modalities?.input?.includes('image'))
 
   // Get the first vision model as default if none selected
-  const effectiveVisionModel = selectedVisionModel || (visionModels.length > 0 ? visionModels[0].id : '')
+  const effectiveVisionModel =
+    selectedVisionModel || (visionModels.length > 0 ? visionModels[0].id : '')
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if ((input.trim() || selectedImages.length > 0) && !isStreaming && !disabled && !isTranscribing && !isProcessingOCR) {
+    if (
+      (input.trim() || selectedImages.length > 0) &&
+      !isStreaming &&
+      !disabled &&
+      !isTranscribing &&
+      !isProcessingOCR
+    ) {
       const activeTool = getActiveTool()
-      
+
       // If using @vision tool, don't do OCR - send images to LLM directly
       if (activeTool === 'vision') {
         if (selectedImages.length === 0) {
@@ -123,7 +163,13 @@ export function ChatInput({
           return
         }
 
-        await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel, selectedImageModel)
+        await onSend(
+          input.trim(),
+          selectedImages,
+          activeTool,
+          effectiveVisionModel,
+          selectedImageModel
+        )
         setInput('')
         setSelectedImages([])
         return
@@ -144,7 +190,13 @@ export function ChatInput({
 
       // If using @create_video tool, don't do OCR - send images for video generation (optional)
       if (activeTool === 'create_video') {
-        await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool, undefined, selectedImageModel)
+        await onSend(
+          input.trim(),
+          selectedImages.length > 0 ? selectedImages : undefined,
+          activeTool,
+          undefined,
+          selectedImageModel
+        )
         setInput('')
         setSelectedImages([])
         return
@@ -152,7 +204,15 @@ export function ChatInput({
 
       // If using @agentic_image tool, pass images for edit mode if provided
       if (activeTool === 'agentic_image') {
-        await onSend(input.trim(), selectedImages.length > 0 ? selectedImages : undefined, activeTool, effectiveVisionModel, selectedImageModel)
+        await onSend(
+          input.trim(),
+          selectedImages.length > 0 ? selectedImages : undefined,
+          activeTool,
+          effectiveVisionModel,
+          selectedImageModel,
+          undefined,
+          maxAgenticIterations
+        )
         setInput('')
         setSelectedImages([])
         return
@@ -165,7 +225,15 @@ export function ChatInput({
           return
         }
 
-        await onSend(input.trim(), selectedImages, activeTool, effectiveVisionModel, undefined, selectedVideoResolution)
+        await onSend(
+          input.trim(),
+          selectedImages,
+          activeTool,
+          effectiveVisionModel,
+          undefined,
+          selectedVideoResolution,
+          maxAgenticIterations
+        )
         setInput('')
         setSelectedImages([])
         return
@@ -179,18 +247,14 @@ export function ChatInput({
           const ocrResults: string[] = []
           for (const img of selectedImages) {
             let ocrText = ''
-            await performOCR(
-              img,
-              apiKey,
-              (chunk) => {
-                ocrText += chunk
-              }
-            )
+            await performOCR(img, apiKey, chunk => {
+              ocrText += chunk
+            })
             if (ocrText.trim()) {
               ocrResults.push(ocrText.trim())
             }
           }
-          
+
           // Combine user input with OCR results
           let finalMessage = input.trim()
           if (ocrResults.length > 0) {
@@ -201,7 +265,7 @@ export function ChatInput({
               finalMessage = `[Image Text]:\n${ocrCombined}`
             }
           }
-          
+
           await onSend(finalMessage, selectedImages, activeTool)
           setInput('')
           setSelectedImages([])
@@ -235,11 +299,11 @@ export function ChatInput({
         } else {
           if (!file.type.startsWith('image/')) continue
         }
-        
+
         const base64 = await processImageFile(file)
         images.push(base64)
       }
-      
+
       setSelectedImages(prev => [...prev, ...images])
     } catch (error) {
       console.error('File processing error:', error)
@@ -310,7 +374,7 @@ export function ChatInput({
     if (lastAtIndex !== -1) {
       const textAfterAt = input.slice(lastAtIndex + 1)
       const spaceIndex = textAfterAt.search(/\s/)
-      
+
       if (spaceIndex === -1 || cursorPosition <= lastAtIndex + 1 + textAfterAt.length) {
         setMentionStartIndex(lastAtIndex)
         setToolSearchQuery(textAfterAt.toLowerCase())
@@ -325,9 +389,10 @@ export function ChatInput({
   }, [input, cursorPosition])
 
   // Filter tools based on search query
-  const filteredTools = availableTools.filter(tool => 
-    tool.name.toLowerCase().includes(toolSearchQuery) ||
-    tool.id.toLowerCase().includes(toolSearchQuery)
+  const filteredTools = availableTools.filter(
+    tool =>
+      tool.name.toLowerCase().includes(toolSearchQuery) ||
+      tool.id.toLowerCase().includes(toolSearchQuery)
   )
 
   // Insert tool mention
@@ -338,7 +403,7 @@ export function ChatInput({
       const newInput = `${beforeMention}@${tool.id} ${afterMention}`
       setInput(newInput)
       setShowToolSuggestions(false)
-      
+
       // Focus textarea and set cursor after the inserted mention
       setTimeout(() => {
         textareaRef.current?.focus()
@@ -389,7 +454,8 @@ export function ChatInput({
 
   const activeTool = getActiveTool()
 
-  const isInputDisabled = disabled || isStreaming || isTranscribing || isRecording || isProcessingOCR
+  const isInputDisabled =
+    disabled || isStreaming || isTranscribing || isRecording || isProcessingOCR
 
   return (
     <div className="border-t border-border/50 bg-card/30">
@@ -438,13 +504,15 @@ export function ChatInput({
           {/* Model Selector for Image Generation */}
           {activeTool === 'create_image' && (
             <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Image Model:</span>
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                Image Model:
+              </span>
               <Select value={selectedImageModel} onValueChange={onImageModelChange}>
                 <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {IMAGE_MODELS.map((model) => (
+                  {IMAGE_MODELS.map(model => (
                     <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
                       {model.name}
                     </SelectItem>
@@ -457,13 +525,15 @@ export function ChatInput({
           {/* Model Selector for Vision */}
           {activeTool === 'vision' && visionModels.length > 0 && (
             <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Vision Model:</span>
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                Vision Model:
+              </span>
               <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
                 <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {visionModels.map((model) => (
+                  {visionModels.map(model => (
                     <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
                       {model.name}
                     </SelectItem>
@@ -476,13 +546,15 @@ export function ChatInput({
           {/* Resolution Selector for Video Generation */}
           {activeTool === 'create_video' && (
             <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Resolution:</span>
+              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                Resolution:
+              </span>
               <Select value={selectedVideoResolution} onValueChange={onVideoResolutionChange}>
                 <SelectTrigger className="w-[100px] sm:w-[120px] h-7 sm:h-8 text-[10px] sm:text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {VIDEO_RESOLUTIONS.map((res) => (
+                  {VIDEO_RESOLUTIONS.map(res => (
                     <SelectItem key={res.id} value={res.id} className="text-[10px] sm:text-xs">
                       {res.name}
                     </SelectItem>
@@ -498,14 +570,20 @@ export function ChatInput({
               {/* Show Image Model only when no images uploaded (create mode) */}
               {selectedImages.length === 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Image Model:</span>
+                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                    Image Model:
+                  </span>
                   <Select value={selectedImageModel} onValueChange={onImageModelChange}>
                     <SelectTrigger className="w-[120px] sm:w-[160px] h-7 sm:h-8 text-[10px] sm:text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {IMAGE_MODELS.map((model) => (
-                        <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                      {IMAGE_MODELS.map(model => (
+                        <SelectItem
+                          key={model.id}
+                          value={model.id}
+                          className="text-[10px] sm:text-xs"
+                        >
                           {model.name}
                         </SelectItem>
                       ))}
@@ -517,20 +595,28 @@ export function ChatInput({
               {selectedImages.length > 0 && (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
                   <span className="text-[10px] sm:text-xs font-medium text-primary">Edit Mode</span>
-                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">({selectedImages.length} image{selectedImages.length > 1 ? 's' : ''})</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">
+                    ({selectedImages.length} image{selectedImages.length > 1 ? 's' : ''})
+                  </span>
                 </div>
               )}
               {/* Always show Vision Model selector */}
               {visionModels.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Vision Model:</span>
+                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                    Vision Model:
+                  </span>
                   <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
                     <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {visionModels.map((model) => (
-                        <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                      {visionModels.map(model => (
+                        <SelectItem
+                          key={model.id}
+                          value={model.id}
+                          className="text-[10px] sm:text-xs"
+                        >
                           {model.name}
                         </SelectItem>
                       ))}
@@ -538,6 +624,25 @@ export function ChatInput({
                   </Select>
                 </div>
               )}
+              {/* Max Iterations Slider */}
+              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  Max Iterations:
+                </span>
+                <div className="flex items-center gap-2 flex-1">
+                  <Slider
+                    value={[maxAgenticIterations]}
+                    onValueChange={value => onMaxAgenticIterationsChange?.(value[0])}
+                    max={10}
+                    min={1}
+                    step={1}
+                    className="flex-1"
+                  />
+                  <span className="text-[10px] sm:text-xs font-medium text-foreground w-6 text-center">
+                    {maxAgenticIterations}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -548,22 +653,28 @@ export function ChatInput({
               {selectedImages.length > 0 ? (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
                   <span className="text-[10px] sm:text-xs font-medium text-primary">Image</span>
-                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">({selectedImages.length} uploaded)</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">
+                    ({selectedImages.length} uploaded)
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/10 border border-destructive/20">
-                  <span className="text-[10px] sm:text-xs font-medium text-destructive">Image Required</span>
+                  <span className="text-[10px] sm:text-xs font-medium text-destructive">
+                    Image Required
+                  </span>
                 </div>
               )}
               {/* Resolution selector */}
               <div className="flex items-center gap-2">
-                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Resolution:</span>
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                  Resolution:
+                </span>
                 <Select value={selectedVideoResolution} onValueChange={onVideoResolutionChange}>
                   <SelectTrigger className="w-[100px] sm:w-[120px] h-7 sm:h-8 text-[10px] sm:text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {VIDEO_RESOLUTIONS.map((res) => (
+                    {VIDEO_RESOLUTIONS.map(res => (
                       <SelectItem key={res.id} value={res.id} className="text-[10px] sm:text-xs">
                         {res.name}
                       </SelectItem>
@@ -574,17 +685,25 @@ export function ChatInput({
               {/* Vision Model selector - only show video-supporting models */}
               {(() => {
                 const videoVisionModels = models.filter(m => supportsVideo(m))
-                const effectiveVideoVisionModel = selectedVisionModel || (videoVisionModels.length > 0 ? videoVisionModels[0].id : '')
+                const effectiveVideoVisionModel =
+                  selectedVisionModel ||
+                  (videoVisionModels.length > 0 ? videoVisionModels[0].id : '')
                 return videoVisionModels.length > 0 ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">Vision Model:</span>
+                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
+                      Vision Model:
+                    </span>
                     <Select value={effectiveVideoVisionModel} onValueChange={onVisionModelChange}>
                       <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {videoVisionModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
+                        {videoVisionModels.map(model => (
+                          <SelectItem
+                            key={model.id}
+                            value={model.id}
+                            className="text-[10px] sm:text-xs"
+                          >
                             {model.name}
                           </SelectItem>
                         ))}
@@ -593,6 +712,25 @@ export function ChatInput({
                   </div>
                 ) : null
               })()}
+              {/* Max Iterations Slider */}
+              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground whitespace-nowrap">
+                  Max Iterations:
+                </span>
+                <div className="flex items-center gap-2 flex-1">
+                  <Slider
+                    value={[maxAgenticIterations]}
+                    onValueChange={value => onMaxAgenticIterationsChange?.(value[0])}
+                    max={10}
+                    min={1}
+                    step={1}
+                    className="flex-1"
+                  />
+                  <span className="text-[10px] sm:text-xs font-medium text-foreground w-6 text-center">
+                    {maxAgenticIterations}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -639,7 +777,15 @@ export function ChatInput({
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     onClick={handleTextareaClick}
-                    placeholder={isRecording ? 'Recording...' : isProcessingOCR ? 'Extracting text...' : selectedImages.length > 0 ? `${selectedImages.length} image(s)` : 'Type message...'}
+                    placeholder={
+                      isRecording
+                        ? 'Recording...'
+                        : isProcessingOCR
+                          ? 'Extracting text...'
+                          : selectedImages.length > 0
+                            ? `${selectedImages.length} image(s)`
+                            : 'Type message...'
+                    }
                     disabled={isInputDisabled}
                     className="min-h-[48px] sm:min-h-[64px] max-h-[120px] sm:max-h-[200px] resize-none border-0 bg-transparent px-3 sm:px-4 py-2.5 sm:py-3.5 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
                     rows={2}
@@ -655,7 +801,9 @@ export function ChatInput({
                 {showToolSuggestions && filteredTools.length > 0 && (
                   <div className="absolute bottom-full left-0 right-0 sm:left-0 sm:right-auto mb-2 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
                     <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Tools</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
+                        Tools
+                      </p>
                     </div>
                     <div className="max-h-36 sm:max-h-48 overflow-y-auto">
                       {filteredTools.map((tool, index) => (
@@ -672,17 +820,25 @@ export function ChatInput({
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs sm:text-sm font-medium truncate">{tool.name}</p>
-                            <p className="text-[9px] sm:text-xs text-muted-foreground truncate">{tool.description}</p>
+                            <p className="text-[9px] sm:text-xs text-muted-foreground truncate">
+                              {tool.description}
+                            </p>
                           </div>
                         </button>
                       ))}
                     </div>
                     <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/30 border-t border-border flex items-center justify-between">
                       <p className="text-[9px] sm:text-[10px] text-muted-foreground">
-                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">↑↓</kbd> to navigate
+                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">
+                          ↑↓
+                        </kbd>{' '}
+                        to navigate
                       </p>
                       <p className="text-[9px] sm:text-[10px] text-muted-foreground">
-                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">Enter</kbd> to select
+                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">
+                          Enter
+                        </kbd>{' '}
+                        to select
                       </p>
                     </div>
                   </div>
@@ -693,7 +849,13 @@ export function ChatInput({
               {!isStreaming ? (
                 <Button
                   type="submit"
-                  disabled={disabled || (!input.trim() && selectedImages.length === 0) || isRecording || isTranscribing || isProcessingOCR}
+                  disabled={
+                    disabled ||
+                    (!input.trim() && selectedImages.length === 0) ||
+                    isRecording ||
+                    isTranscribing ||
+                    isProcessingOCR
+                  }
                   className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-primary/50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
                 >
                   <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -714,36 +876,48 @@ export function ChatInput({
             {/* Audio Visualizer - Full width on mobile */}
             {isRecording && audioData && (
               <div className="h-8 sm:h-10 rounded-lg bg-muted/30 border border-border/30 overflow-hidden">
-                <AudioVisualizer
-                  audioData={audioData}
-                  isActive={isRecording}
-                  barCount={24}
-                />
+                <AudioVisualizer audioData={audioData} isActive={isRecording} barCount={24} />
               </div>
             )}
 
             {/* Helper Text - Stacked on mobile, horizontal on desktop */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-[9px] sm:text-[10px] text-muted-foreground px-0.5">
               <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                <span className="whitespace-nowrap"><kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">Enter</kbd> to send</span>
+                <span className="whitespace-nowrap">
+                  <kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">
+                    Enter
+                  </kbd>{' '}
+                  to send
+                </span>
                 <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                <span className="whitespace-nowrap"><kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">Shift+Enter</kbd> new line</span>
+                <span className="whitespace-nowrap">
+                  <kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">
+                    Shift+Enter
+                  </kbd>{' '}
+                  new line
+                </span>
                 {isRecording && (
                   <>
                     <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                    <span className="text-destructive font-medium whitespace-nowrap">Recording...</span>
+                    <span className="text-destructive font-medium whitespace-nowrap">
+                      Recording...
+                    </span>
                   </>
                 )}
                 {isTranscribing && (
                   <>
                     <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                    <span className="text-primary font-medium whitespace-nowrap">Transcribing...</span>
+                    <span className="text-primary font-medium whitespace-nowrap">
+                      Transcribing...
+                    </span>
                   </>
                 )}
                 {isProcessingOCR && (
                   <>
                     <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                    <span className="text-primary font-medium whitespace-nowrap">Processing OCR...</span>
+                    <span className="text-primary font-medium whitespace-nowrap">
+                      Processing OCR...
+                    </span>
                   </>
                 )}
               </div>

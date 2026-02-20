@@ -57,15 +57,13 @@ export function ChatContainer({ conversation, isStreaming, apiKey }: ChatContain
   const showLoading = isStreaming && isLastMessageEmpty
 
   // Filter out the last empty message when showing loading
-  const messagesToShow = showLoading 
-    ? conversation.messages.slice(0, -1) 
-    : conversation.messages
+  const messagesToShow = showLoading ? conversation.messages.slice(0, -1) : conversation.messages
 
   return (
     <div className="flex-1 overflow-hidden">
       <ScrollArea className="h-full" ref={scrollAreaRef}>
         <div className="flex max-w-4xl flex-col mx-auto px-4 py-4">
-          {messagesToShow.map((message) => (
+          {messagesToShow.map(message => (
             <MessageBubble key={message.id} message={message} apiKey={apiKey} />
           ))}
           {showLoading && (
@@ -83,9 +81,18 @@ export function ChatContainer({ conversation, isStreaming, apiKey }: ChatContain
                   </div>
                   <div className="flex items-center gap-1 px-3 py-2 rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span
+                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                        style={{ animationDelay: '0ms' }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                        style={{ animationDelay: '150ms' }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                        style={{ animationDelay: '300ms' }}
+                      />
                     </div>
                   </div>
                 </div>

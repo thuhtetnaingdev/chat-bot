@@ -2,7 +2,13 @@ import { type PromptVariant as PromptVariantType, type SessionType } from '@/typ
 import { IMAGE_MODELS } from '@/types'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { X, Play, Loader2 } from 'lucide-react'
 
 interface PromptVariantProps {
@@ -58,7 +64,7 @@ export function PromptVariantCard({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {IMAGE_MODELS.map((model) => (
+                {IMAGE_MODELS.map(model => (
                   <SelectItem key={model.id} value={model.id} className="text-[10px]">
                     {model.name}
                   </SelectItem>
@@ -94,16 +100,18 @@ export function PromptVariantCard({
           )}
         </div>
       </div>
-      
+
       <div className="p-2">
         <Textarea
           value={variant.prompt}
-          onChange={(e) => onUpdate(e.target.value)}
-          placeholder={sessionType === 'image' 
-            ? "Enter image prompt... Use {{variable:default}} for variables"
-            : sessionType === 'edit'
-            ? "Enter editing instructions... Use {{variable:default}} for variables"
-            : "Enter your prompt... Use {{variable:default}} for variables"}
+          onChange={e => onUpdate(e.target.value)}
+          placeholder={
+            sessionType === 'image'
+              ? 'Enter image prompt... Use {{variable:default}} for variables'
+              : sessionType === 'edit'
+                ? 'Enter editing instructions... Use {{variable:default}} for variables'
+                : 'Enter your prompt... Use {{variable:default}} for variables'
+          }
           disabled={isRunning}
           className="min-h-[80px] text-xs resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
         />

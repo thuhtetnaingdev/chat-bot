@@ -65,14 +65,14 @@ export const VARIABLE_REGEX = /\{\{(\w+)(?::([^}]+))?\}\}/g
 export function detectVariables(prompt: string): PromptVariable[] {
   const variables: PromptVariable[] = []
   const seen = new Set<string>()
-  
+
   VARIABLE_REGEX.lastIndex = 0
-  
+
   let match
   while ((match = VARIABLE_REGEX.exec(prompt)) !== null) {
     const name = match[1]
     const defaultValue = match[2] || ''
-    
+
     if (!seen.has(name)) {
       seen.add(name)
       variables.push({
@@ -82,7 +82,7 @@ export function detectVariables(prompt: string): PromptVariable[] {
       })
     }
   }
-  
+
   return variables
 }
 
@@ -92,7 +92,7 @@ export function mergeVariables(
 ): PromptVariable[] {
   const merged: PromptVariable[] = []
   const existingMap = new Map(existing.map(v => [v.name, v]))
-  
+
   for (const detectedVar of detected) {
     const existingVar = existingMap.get(detectedVar.name)
     if (existingVar) {
@@ -104,24 +104,18 @@ export function mergeVariables(
       merged.push(detectedVar)
     }
   }
-  
+
   return merged
 }
 
-export function interpolatePrompt(
-  prompt: string,
-  variables: PromptVariable[]
-): string {
+export function interpolatePrompt(prompt: string, variables: PromptVariable[]): string {
   let result = prompt
-  
+
   for (const variable of variables) {
-    const regex = new RegExp(
-      `\\{\\{${variable.name}(?::[^}]+)?\\}\\}`,
-      'g'
-    )
+    const regex = new RegExp(`\\{\\{${variable.name}(?::[^}]+)?\\}\\}`, 'g')
     result = result.replace(regex, variable.currentValue || variable.defaultValue)
   }
-  
+
   return result
 }
 
@@ -136,7 +130,7 @@ export function generateSessionName(existingSessions: PlaygroundSession[]): stri
       return match ? parseInt(match[1]) : 0
     })
     .filter(n => !isNaN(n) && n > 0)
-  
+
   const nextNumber = numbers.length > 0 ? Math.max(...numbers) + 1 : 1
   return `Session ${nextNumber}`
 }
@@ -144,21 +138,19 @@ export function generateSessionName(existingSessions: PlaygroundSession[]): stri
 export function generateVariantName(variants: PromptVariant[]): string {
   const labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   const usedLabels = new Set(variants.map(v => v.name))
-  
+
   for (const label of labels) {
     if (!usedLabels.has(label)) {
       return label
     }
   }
-  
+
   return `Variant ${variants.length + 1}`
 }
 
 export function getBestRun(runs: TestRun[]): TestRun | null {
   const ratedRuns = runs.filter(r => r.rating > 0)
   if (ratedRuns.length === 0) return null
-  
-  return ratedRuns.reduce((best, current) => 
-    current.rating > best.rating ? current : best
-  )
+
+  return ratedRuns.reduce((best, current) => (current.rating > best.rating ? current : best))
 }

@@ -30,7 +30,7 @@ export function Sidebar({
     <aside className="flex h-full w-full flex-col border-r border-border/50 bg-sidebar/10 backdrop-blur-sm">
       <SidebarHeader onNewChat={onNewChat} />
       <Separator className="bg-border/50" />
-      
+
       <div className="flex-1 overflow-hidden">
         <ConversationList
           conversations={conversations}
@@ -42,7 +42,7 @@ export function Sidebar({
       </div>
 
       <Separator className="bg-border/50" />
-      
+
       <div className="p-3">
         <Button
           variant={isLabOpen ? 'default' : 'outline'}

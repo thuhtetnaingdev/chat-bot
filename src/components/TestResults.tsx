@@ -100,9 +100,7 @@ export function TestResults({
                 <span className="flex items-center justify-center h-5 w-5 rounded bg-primary/10 text-primary text-[10px] font-semibold">
                   {labels[index]}
                 </span>
-                {isBest && (
-                  <span className="text-[10px] text-primary font-medium">Best</span>
-                )}
+                {isBest && <span className="text-[10px] text-primary font-medium">Best</span>}
                 {isRunning && (
                   <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -110,7 +108,7 @@ export function TestResults({
                   </span>
                 )}
               </div>
-              
+
               {run && !isRunning && sessionType === 'text' && (
                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                   <span>{run.metrics.totalTokens} tok</span>
@@ -136,11 +134,7 @@ export function TestResults({
                     <div className="grid grid-cols-2 gap-2 mb-3">
                       <div>
                         <p className="text-[10px] text-muted-foreground mb-1">Input</p>
-                        <img
-                          src={run.inputImage}
-                          alt="Input"
-                          className="w-full rounded-lg"
-                        />
+                        <img src={run.inputImage} alt="Input" className="w-full rounded-lg" />
                       </div>
                       <div className="relative group">
                         <p className="text-[10px] text-muted-foreground mb-1">Output</p>
@@ -189,7 +183,7 @@ export function TestResults({
 
                   <div className="space-y-3">
                     <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
+                      {[1, 2, 3, 4, 5].map(star => (
                         <button
                           key={star}
                           type="button"
@@ -210,7 +204,7 @@ export function TestResults({
 
                     <Textarea
                       value={run.notes}
-                      onChange={(e) => onUpdateNotes(run.id, e.target.value)}
+                      onChange={e => onUpdateNotes(run.id, e.target.value)}
                       placeholder="Add notes..."
                       className="min-h-[40px] text-xs resize-none"
                     />
@@ -240,7 +234,12 @@ export function TestResults({
                 </>
               ) : (
                 <div className="text-xs text-muted-foreground text-center py-4">
-                  Click run to generate {sessionType === 'image' ? 'image' : sessionType === 'edit' ? 'edited image' : 'output'}
+                  Click run to generate{' '}
+                  {sessionType === 'image'
+                    ? 'image'
+                    : sessionType === 'edit'
+                      ? 'edited image'
+                      : 'output'}
                 </div>
               )}
             </div>
@@ -250,13 +249,13 @@ export function TestResults({
 
       {/* Image Preview Modal */}
       {previewRun && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setPreviewRun(null)}
         >
-          <div 
+          <div
             className="relative max-w-4xl max-h-[90vh] w-full bg-card rounded-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
               <div className="flex items-center gap-2">
@@ -292,19 +291,11 @@ export function TestResults({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">Input</p>
-                    <img
-                      src={previewRun.inputImage}
-                      alt="Input"
-                      className="w-full rounded-lg"
-                    />
+                    <img src={previewRun.inputImage} alt="Input" className="w-full rounded-lg" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">Output</p>
-                    <img
-                      src={previewRun.output}
-                      alt="Output"
-                      className="w-full rounded-lg"
-                    />
+                    <img src={previewRun.output} alt="Output" className="w-full rounded-lg" />
                   </div>
                 </div>
               ) : (

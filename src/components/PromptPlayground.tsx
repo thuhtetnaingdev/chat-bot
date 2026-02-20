@@ -4,10 +4,28 @@ import { usePlayground } from '@/hooks/usePlayground'
 import { PromptVariantCard } from './PromptVariant'
 import { TestResults } from './TestResults'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Trash2, Play, Copy, Check, Loader2, ChevronDown, ChevronRight, FlaskConical, Type, ImageIcon } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Play,
+  Copy,
+  Check,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  FlaskConical,
+  Type,
+  ImageIcon
+} from 'lucide-react'
 import { MAX_VARIANTS } from '@/types/playground'
 import { cn } from '@/lib/utils'
 
@@ -113,28 +131,20 @@ export function PromptPlayground({
       <div className="border-b border-border/50 bg-card/30 px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1">
-            <Select
-              value={activeSession.id}
-              onValueChange={selectSession}
-            >
+            <Select value={activeSession.id} onValueChange={selectSession}>
               <SelectTrigger className="w-[180px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {sessions.map((session) => (
+                {sessions.map(session => (
                   <SelectItem key={session.id} value={session.id}>
                     {session.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={createNewSession}
-              className="h-8"
-            >
+
+            <Button variant="outline" size="sm" onClick={createNewSession} className="h-8">
               <Plus className="h-3.5 w-3.5 mr-1" />
               New
             </Button>
@@ -232,9 +242,7 @@ export function PromptPlayground({
           {activeSession.type === 'edit' && (
             <div className="border border-border/50 rounded-lg bg-card/30 overflow-hidden">
               <div className="px-3 py-2 border-b border-border/50 bg-muted/30">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Source Image
-                </span>
+                <span className="text-xs font-medium text-muted-foreground">Source Image</span>
               </div>
               <div className="p-3">
                 {!activeSession.editImage ? (
@@ -242,7 +250,7 @@ export function PromptPlayground({
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={async (e) => {
+                      onChange={async e => {
                         const file = e.target.files?.[0]
                         if (file) {
                           const { processImageFile } = await import('@/lib/api')
@@ -303,17 +311,12 @@ export function PromptPlayground({
                 </Button>
               )}
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
               {activeSession.variants.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-xs">
                   <p className="mb-2">No variants yet</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={addVariant}
-                    disabled={isRunning}
-                  >
+                  <Button variant="outline" size="sm" onClick={addVariant} disabled={isRunning}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Add Variant
                   </Button>
@@ -328,8 +331,8 @@ export function PromptPlayground({
                     canDelete={activeSession.variants.length > 1}
                     isRunning={runningVariantIds.includes(variant.id)}
                     streamingOutput={streamingOutput[variant.id]}
-                    onUpdate={(prompt) => updateVariant(variant.id, { prompt })}
-                    onImageModelChange={(imageModel) => updateVariant(variant.id, { imageModel })}
+                    onUpdate={prompt => updateVariant(variant.id, { prompt })}
+                    onImageModelChange={imageModel => updateVariant(variant.id, { imageModel })}
                     onRemove={() => removeVariant(variant.id)}
                     onRun={() => runVariant(variant.id)}
                   />
@@ -355,10 +358,10 @@ export function PromptPlayground({
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                 )}
               </button>
-              
+
               {showVariables && (
                 <div className="p-3 space-y-2">
-                  {activeSession.variables.map((variable) => (
+                  {activeSession.variables.map(variable => (
                     <div key={variable.name} className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground w-24 shrink-0">
                         {`{{${variable.name}}}`}
@@ -366,7 +369,7 @@ export function PromptPlayground({
                       <input
                         type="text"
                         value={variable.currentValue}
-                        onChange={(e) => updateVariableValue(variable.name, e.target.value)}
+                        onChange={e => updateVariableValue(variable.name, e.target.value)}
                         placeholder={variable.defaultValue || 'Enter value...'}
                         disabled={isRunning}
                         className="flex-1 px-2 py-1 text-xs border border-border/50 rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring/20"
@@ -388,7 +391,7 @@ export function PromptPlayground({
             <div className="p-2">
               <Textarea
                 value={activeSession.testInput}
-                onChange={(e) => setTestInput(e.target.value)}
+                onChange={e => setTestInput(e.target.value)}
                 placeholder="Add optional input to test prompts against..."
                 disabled={isRunning}
                 className="min-h-[60px] text-xs resize-none border-0 bg-transparent p-0 focus-visible:ring-0"
@@ -400,9 +403,7 @@ export function PromptPlayground({
         {/* Right Panel - Results */}
         <div className="w-1/2 flex flex-col overflow-hidden border border-border/50 rounded-lg bg-card/30">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-muted/30">
-            <span className="text-xs font-medium text-muted-foreground">
-              Results
-            </span>
+            <span className="text-xs font-medium text-muted-foreground">Results</span>
             <div className="flex items-center gap-2">
               {hasRuns && (
                 <Button
@@ -468,11 +469,7 @@ export function PromptPlayground({
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteSession}
-              className="text-xs"
-            >
+            <Button variant="destructive" onClick={handleDeleteSession} className="text-xs">
               Delete
             </Button>
           </div>
