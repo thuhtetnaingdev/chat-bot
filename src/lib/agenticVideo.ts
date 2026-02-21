@@ -70,15 +70,8 @@ export const agenticVideoGeneration = async (
 
     // If not satisfied and not last iteration, prepare edit prompt
     if (i < maxIterations) {
-      // Build edit prompt from vision feedback
-      const issues =
-        visionFeedback.issues.length > 0
-          ? visionFeedback.issues.join(', ')
-          : 'improve video quality'
-
-      currentPrompt =
-        visionFeedback.suggestedEdit ||
-        `Fix the following issues: ${issues}. Maintain the original concept: ${originalPrompt}`
+      // Use vision suggestion if available, otherwise use original prompt
+      currentPrompt = visionFeedback.suggestedEdit || originalPrompt
 
       callbacks?.onEditPromptGenerated?.(i + 1, currentPrompt)
     }

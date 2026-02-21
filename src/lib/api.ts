@@ -867,21 +867,15 @@ Create a simple, effective edit prompt that addresses the issues while preservin
       rawPrompt.toLowerCase().includes('unable') ||
       rawPrompt.toLowerCase().includes('refuse')
 
-    // If planning failed, returned empty, or refused - always generate a prompt
+    // If planning failed, returned empty, or refused - return original prompt
     if (isRefusal || !rawPrompt) {
-      // Always return a valid prompt - enhance visual quality for any content
-      const enhancement =
-        'Enhance visual quality: improve lighting, better composition, more detailed, vibrant colors, high quality'
-      return visionFeedback.suggestedEdit || `${userPrompt}. ${enhancement}`
+      return userPrompt
     }
 
     return rawPrompt
   } catch (error) {
     console.error('Planning agent error:', error)
-    // Always return a valid prompt - enhance visual quality
-    const enhancement =
-      'Enhance visual quality: improve lighting, better composition, more detailed, vibrant colors, high quality'
-    return visionFeedback.suggestedEdit || `${userPrompt}. ${enhancement}`
+    return userPrompt
   }
 }
 
@@ -1271,7 +1265,7 @@ export const fetchModels = async (): Promise<Model[]> => {
       const costModel = m.cost
       const cost =
         typeof costModel === 'object' && costModel !== null && 'input' in costModel
-          ? (costModel as { input?: number }).input ?? 0
+          ? ((costModel as { input?: number }).input ?? 0)
           : 0
       return {
         id: m.id,

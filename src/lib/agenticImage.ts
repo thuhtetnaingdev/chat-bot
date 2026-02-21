@@ -91,12 +91,12 @@ export const agenticImageGeneration = async (
             `Planning agent generated initial prompt: "${plannedPrompt.slice(0, 100)}..."`
           )
         } catch (error) {
-          console.warn('Planning agent failed, using analysis preservation prompt:', error)
-          currentPrompt = imageAnalysis.preservationInstructions
+          console.warn('Planning agent failed, using original prompt:', error)
+          currentPrompt = originalPrompt
         }
       } else {
-        // No planning model - use preservation instructions from analysis
-        currentPrompt = imageAnalysis.preservationInstructions
+        // No planning model - use original prompt
+        currentPrompt = originalPrompt
       }
     } catch (error) {
       // Analysis failed - throw error to stop the edit
@@ -182,25 +182,12 @@ export const agenticImageGeneration = async (
             `Iteration ${i}: Planning agent generated: "${plannedPrompt.slice(0, 100)}..."`
           )
         } catch (error) {
-          console.warn('Planning agent failed, using fallback:', error)
-          // Fallback to vision suggestion or simple prompt
-          const issues =
-            visionFeedback.issues.length > 0
-              ? visionFeedback.issues.join(', ')
-              : 'improve image quality'
-          currentPrompt =
-            visionFeedback.suggestedEdit ||
-            `Fix the following issues: ${issues}. Maintain the original concept: ${originalPrompt}`
+          console.warn('Planning agent failed, using original prompt:', error)
+          currentPrompt = originalPrompt
         }
       } else {
-        // No planning model selected - use simple fallback
-        const issues =
-          visionFeedback.issues.length > 0
-            ? visionFeedback.issues.join(', ')
-            : 'improve image quality'
-        currentPrompt =
-          visionFeedback.suggestedEdit ||
-          `Fix the following issues: ${issues}. Maintain the original concept: ${originalPrompt}`
+        // No planning model selected - use original prompt
+        currentPrompt = originalPrompt
       }
 
       // Determine which images to use for next iteration based on strategy
