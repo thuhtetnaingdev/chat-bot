@@ -458,13 +458,13 @@ export function ChatInput({
     disabled || isStreaming || isTranscribing || isRecording || isProcessingOCR
 
   return (
-    <div className="border-t border-border/50 bg-card/30">
-      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
+    <div className="border-t border-border/30 bg-card/50 backdrop-blur-xl">
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-3 sm:py-4">
         <form onSubmit={handleSubmit}>
           {/* Error Message */}
           {(transcriptionError || recordingError) && (
-            <div className="mb-2 sm:mb-3 flex items-center justify-between px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-destructive/10 border border-destructive/20">
-              <p className="text-[10px] sm:text-xs text-destructive line-clamp-2">
+            <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20 shadow-sm">
+              <p className="text-xs text-destructive line-clamp-2">
                 {transcriptionError || recordingError}
               </p>
               <Button
@@ -472,7 +472,7 @@ export function ChatInput({
                 variant="ghost"
                 size="sm"
                 onClick={handleClearError}
-                className="h-6 sm:h-7 text-[10px] sm:text-xs hover:bg-destructive/20 shrink-0"
+                className="h-7 text-xs hover:bg-destructive/20 shrink-0"
               >
                 Dismiss
               </Button>
@@ -770,7 +770,7 @@ export function ChatInput({
 
               {/* Text Input */}
               <div className="flex-1 min-w-0 relative">
-                <div className="relative border border-border/50 rounded-lg bg-background focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-colors">
+                <div className="relative border border-border/30 rounded-xl bg-background/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all shadow-sm">
                   <Textarea
                     ref={textareaRef}
                     value={input}
@@ -787,11 +787,11 @@ export function ChatInput({
                             : 'Type message...'
                     }
                     disabled={isInputDisabled}
-                    className="min-h-[48px] sm:min-h-[64px] max-h-[120px] sm:max-h-[200px] resize-none border-0 bg-transparent px-3 sm:px-4 py-2.5 sm:py-3.5 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
+                    className="min-h-[48px] sm:min-h-[56px] max-h-[120px] sm:max-h-[180px] resize-none border-0 bg-transparent px-4 py-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
                     rows={2}
                   />
                   {input.length > 0 && (
-                    <div className="absolute bottom-1.5 right-2 sm:bottom-2 sm:right-3 text-[9px] sm:text-[10px] text-muted-foreground/60">
+                    <div className="absolute bottom-2.5 right-3 text-[10px] text-muted-foreground/60">
                       {input.length}
                     </div>
                   )}
@@ -856,9 +856,9 @@ export function ChatInput({
                     isTranscribing ||
                     isProcessingOCR
                   }
-                  className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-primary/50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
+                  className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 rounded-xl border border-primary/30 bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:from-primary/90 hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
                 >
-                  <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <ArrowUp className="h-5 w-5" />
                 </Button>
               ) : (
                 <Button
@@ -866,9 +866,9 @@ export function ChatInput({
                   onClick={onStop}
                   variant="destructive"
                   disabled={isRecording || isTranscribing}
-                  className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-destructive/50 bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
+                  className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 rounded-xl border border-destructive/30 bg-gradient-to-br from-destructive to-destructive/90 text-destructive-foreground shadow-lg shadow-destructive/25 hover:shadow-destructive/40 hover:from-destructive/90 hover:to-destructive disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
                 >
-                  <Square className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <Square className="h-5 w-5" />
                 </Button>
               )}
             </div>

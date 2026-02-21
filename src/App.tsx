@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { useSettings } from './hooks/useSettings'
 import { useChat } from './hooks/useChat'
 import { Sidebar } from './components/Sidebar'
@@ -17,6 +18,10 @@ import { Settings, Menu, X, Loader2 } from 'lucide-react'
 import { fetchModels } from './lib/api'
 import { type Model } from './types'
 import { cn } from '@/lib/utils'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
 
 function App() {
   const { settings, updateSettings, isLoaded: settingsLoaded } = useSettings()
@@ -120,7 +125,12 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/" element={<div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {/* Mobile Sidebar Overlay */}
       <div
         className={cn(
@@ -387,6 +397,8 @@ function App() {
         </div>
       )}
     </div>
+    } />
+    </Routes>
   )
 }
 

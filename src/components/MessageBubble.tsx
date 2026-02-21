@@ -1,5 +1,6 @@
 import { type Message } from '@/types'
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -7,7 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Brain,
-  Terminal,
+  Bot,
   User,
   Loader2,
   Volume2,
@@ -44,29 +45,39 @@ function ImagePreviewModal({
 }) {
   if (!isOpen) return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-8 bg-black/90 backdrop-blur-md"
       onClick={onClose}
     >
-      <div className="relative max-w-[90vw] max-h-[90vh]">
+      {/* Header with close button */}
+      <div className="w-full max-w-[90vw] flex items-center justify-between mb-4">
+        <span className="text-white/60 text-sm">Image Preview</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Image container */}
+      <div 
+        className="relative max-w-[90vw] max-h-[80vh]"
+        onClick={e => e.stopPropagation()}
+      >
         <img
           src={src}
           alt="Preview"
-          className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-          onClick={e => e.stopPropagation()}
+          className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
         />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="absolute -top-12 right-0 h-10 w-10 text-white hover:bg-white/20"
-        >
-          <X className="h-6 w-6" />
-        </Button>
       </div>
-    </div>
+
+      {/* Footer hint */}
+      <p className="mt-4 text-white/40 text-sm">Click anywhere to close</p>
+    </div>,
+    document.body
   )
 }
 
@@ -244,23 +255,23 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
       <div className={cn('flex w-full gap-3 py-3', isUser ? 'justify-end' : 'justify-start')}>
         <div
           className={cn(
-            'flex gap-2 max-w-[90%] md:max-w-[80%]',
+            'flex gap-3 max-w-[90%] md:max-w-[80%]',
             isUser ? 'flex-row-reverse' : 'flex-row'
           )}
         >
           <div
             className={cn(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-sm',
               isUser
-                ? 'bg-primary text-primary-foreground border-primary/50'
-                : 'bg-card border-border/50'
+                ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-primary/50 shadow-primary/20'
+                : 'bg-gradient-to-br from-card to-card border-border/50 shadow-sm'
             )}
           >
-            {isUser ? <User className="h-4 w-4" /> : <Terminal className="h-4 w-4" />}
+            {isUser ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5 text-primary" />}
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-0 max-w-full overflow-hidden">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground px-1">
               {isUser ? 'You' : message.model ? message.model.split('/').pop() : 'Assistant'}
               <span className="text-[10px] opacity-50">
                 {new Date(message.timestamp).toLocaleTimeString([], {
@@ -272,10 +283,10 @@ export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
 
             <Card
               className={cn(
-                'border border-border/50 shadow-xs',
+                'border shadow-sm',
                 isUser
-                  ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20'
-                  : 'bg-card/50 backdrop-blur-sm border-border/30'
+                  ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20 rounded-2xl rounded-tr-md'
+                  : 'bg-gradient-to-br from-card via-card to-muted/10 border-border/30 rounded-2xl rounded-tl-md'
               )}
             >
               <div className={isUser ? 'px-3 py-2' : 'p-4'}>
