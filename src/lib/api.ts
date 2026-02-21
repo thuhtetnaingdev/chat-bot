@@ -1,4 +1,5 @@
 import { type Model, IMAGE_MODELS, type VisionVerification, type ImageAnalysis } from '@/types'
+import { resizeImageForAPI } from './imageCompression'
 
 const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
@@ -183,9 +184,7 @@ export const getImageDimensions = (
 export const editImage = async (
   prompt: string,
   images: string[],
-  apiKey: string,
-  width?: number,
-  height?: number
+  apiKey: string
 ): Promise<string> => {
   if (!apiKey) {
     throw new Error('API key required for image editing')
@@ -196,22 +195,24 @@ export const editImage = async (
   }
 
   try {
+    // Resize images if needed to avoid API limits
+    const resizedImages = await Promise.all(images.map(img => resizeImageForAPI(img, 1536)))
+
+    // Get dimensions from the first resized image
+    const dimensions = await getImageDimensions(resizedImages[0])
+
     // Strip data URL prefix from images (e.g., "data:image/png;base64," -> "")
-    const cleanImages = images.map(img => {
+    const cleanImages = resizedImages.map(img => {
       const commaIndex = img.indexOf(',')
       return commaIndex !== -1 ? img.slice(commaIndex + 1) : img
     })
 
-    // Build request body with optional width/height
+    // Build request body with resized image dimensions
     const requestBody: Record<string, unknown> = {
       prompt,
-      image_b64s: cleanImages
-    }
-
-    // Add width and height if provided to maintain original aspect ratio
-    if (width && height) {
-      requestBody.width = width
-      requestBody.height = height
+      image_b64s: cleanImages,
+      width: dimensions.width,
+      height: dimensions.height
     }
 
     const response = await fetch('https://chutes-qwen-image-edit-2511.chutes.ai/generate', {
@@ -476,6 +477,9 @@ export const analyzeImageForEditing = async (
     throw new Error('API key required for image analysis')
   }
 
+  // Resize images if needed to avoid API limits
+  const resizedImages = await Promise.all(images.map(img => resizeImageForAPI(img, 1536)))
+
   const systemPrompt = `Analyze images and output ONLY valid JSON. No explanations, no markdown, just JSON.
 
 Required JSON format:
@@ -513,7 +517,7 @@ Rules:
 OUTPUT ONLY JSON. No explanations. Example:
 {"hasFaces":true,"faces":[{"id":1,"location":"center","description":"woman"}],"clothing":[{"item":"shirt","color":"red","location":"center"}],"background":"park","keyObjects":["tree","bench"],"totalElements":5}`
           },
-          ...images.map(img => ({
+          ...resizedImages.map(img => ({
             type: 'image_url' as const,
             image_url: {
               url: img

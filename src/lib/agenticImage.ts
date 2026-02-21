@@ -3,7 +3,6 @@ import {
   editImage,
   verifyImageWithVision,
   analyzeImageForEditing,
-  getImageDimensions,
   planEditPrompt
 } from '@/lib/api'
 import { type AgenticIteration, type VisionVerification, type ImageAnalysis } from '@/types'
@@ -46,17 +45,6 @@ export const agenticImageGeneration = async (
 
   // Store analysis for all iterations
   let imageAnalysis: ImageAnalysis | undefined
-
-  // Get original image dimensions to maintain aspect ratio
-  let originalDimensions: { width: number; height: number } | undefined
-  if (isEdit && originalInputImages.length > 0) {
-    try {
-      originalDimensions = await getImageDimensions(originalInputImages[0])
-    } catch (error) {
-      console.warn('Could not get original image dimensions:', error)
-      // Continue without dimensions - API will use defaults
-    }
-  }
 
   // STEP 1: Pre-analysis for edit mode (Vision First approach)
   if (isEdit && originalInputImages.length > 0) {
@@ -116,14 +104,8 @@ export const agenticImageGeneration = async (
     } else {
       // CRITICAL: Always use ONLY original input images for editing
       // Never pass previously edited images to prevent face/identity drift
-      // Pass original dimensions to maintain aspect ratio
-      currentImage = await editImage(
-        currentPrompt,
-        originalInputImages,
-        apiKey,
-        originalDimensions?.width,
-        originalDimensions?.height
-      )
+      // Dimensions are now calculated from resized images in editImage
+      currentImage = await editImage(currentPrompt, originalInputImages, apiKey)
     }
 
     // Track this edited result

@@ -51,6 +51,67 @@ export async function compressImage(
   })
 }
 
+export async function resizeImageForAPI(
+  base64Image: string,
+  maxDimension: number = 1536
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+
+    img.onload = () => {
+      // Skip if image is already within limits
+      if (img.width <= maxDimension && img.height <= maxDimension) {
+        resolve(base64Image)
+        return
+      }
+
+      // Calculate new dimensions maintaining aspect ratio
+      let width = img.width
+      let height = img.height
+
+      if (width > height) {
+        if (width > maxDimension) {
+          const ratio = maxDimension / width
+          width = maxDimension
+          height = height * ratio
+        }
+      } else {
+        if (height > maxDimension) {
+          const ratio = maxDimension / height
+          height = maxDimension
+          width = width * ratio
+        }
+      }
+
+      // Create canvas
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(width)
+      canvas.height = Math.round(height)
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'))
+        return
+      }
+
+      // Draw resized image with high quality
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(img, 0, 0, Math.round(width), Math.round(height))
+
+      // Convert to base64 with high quality
+      const resized = canvas.toDataURL('image/jpeg', 0.95)
+      resolve(resized)
+    }
+
+    img.onerror = () => {
+      reject(new Error('Failed to load image for resizing'))
+    }
+
+    img.src = base64Image
+  })
+}
+
 /**
  * Compress multiple images
  */
