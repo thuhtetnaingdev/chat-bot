@@ -400,6 +400,10 @@ export function useChat(settings: Settings, models: Model[] = []) {
           const visionModelToUse = visionModel || settings.selectedVisionModel
           const initialImage = images && images.length > 0 ? images[0] : undefined
 
+          if (!initialImage) {
+            throw new Error('Please attach an image to generate a video from.')
+          }
+
           const result = await agenticVideoGeneration(
             prompt,
             settings.apiKey,

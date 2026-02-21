@@ -1269,11 +1269,10 @@ export const fetchModels = async (): Promise<Model[]> => {
         modalities?: { input?: string[]; output?: string[] }
       }
       const costModel = m.cost
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cost =
         typeof costModel === 'object' && costModel !== null && 'input' in costModel
-          ? (costModel as any).input
-          : undefined
+          ? (costModel as { input?: number }).input ?? 0
+          : 0
       return {
         id: m.id,
         name: m.name,
