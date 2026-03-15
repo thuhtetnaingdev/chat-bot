@@ -11,6 +11,7 @@ import {
 import { chatWithLLM, generateImage, editImage, generateVideo, type ChatMessage } from '@/lib/api'
 import { agenticImageGeneration } from '@/lib/agenticImage'
 import { agenticVideoGeneration } from '@/lib/agenticVideo'
+import { RPGGameEngine, type RPGGameState } from '@/lib/rpg'
 
 export function useChat(settings: Settings, models: Model[] = []) {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -18,6 +19,8 @@ export function useChat(settings: Settings, models: Model[] = []) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [storageError, setStorageError] = useState<string | null>(null)
+  const [rpgEngine, setRpgEngine] = useState<RPGGameEngine | null>(null)
+  const [isProcessingRPG, setIsProcessingRPG] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Initialize storage and load conversations
@@ -160,7 +163,8 @@ export function useChat(settings: Settings, models: Model[] = []) {
           activeTool === 'edit_image' ||
           activeTool === 'create_video' ||
           activeTool === 'agentic_image' ||
-          activeTool === 'agentic_video'
+          activeTool === 'agentic_video' ||
+          activeTool === 'rpg'
             ? 'pending'
             : undefined,
         generatedImages: [],
@@ -625,6 +629,56 @@ export function useChat(settings: Settings, models: Model[] = []) {
               return conv
             })
           )
+        } else if (activeTool === 'rpg') {
+          // RPG Game mode - Initialize game with agents using selected model
+          const topic = userMessage.replace(/@rpg\s*/gi, '').trim()
+
+          if (!topic) {
+            throw new Error(
+              'Please provide a topic for the RPG game. E.g., @rpg Create a fantasy world'
+            )
+          }
+
+          // Import agent templates and set selected model
+          const { RPG_AGENT_TEMPLATES } = await import('@/types/rpg')
+          const selectedModel = settings.selectedModel || 'unsloth/gemma-3-27b-it'
+          console.log('RPG using model:', selectedModel)
+          const agents = RPG_AGENT_TEMPLATES.slice(0, 3).map(agent => ({
+            ...agent,
+            model: selectedModel
+          }))
+
+          // Initialize game state
+          const initialGameState: RPGGameState = {
+            gameId: `rpg-${Date.now()}`,
+            topic,
+            round: 0,
+            status: 'active',
+            context: {
+              story: '',
+              elements: [],
+              decisions: []
+            },
+            settings: {
+              chaosEventsEnabled: true,
+              chaosEventProbability: 0.2
+            }
+          }
+
+          setConversations(prev =>
+            prev.map(conv => {
+              if (conv.id === conversation!.id) {
+                const msgs = [...conv.messages]
+                const lastMsg = msgs[msgs.length - 1]
+                lastMsg.rpgState = initialGameState
+                lastMsg.rpgAgents = agents
+                lastMsg.content = `🎮 RPG Session Started: ${topic}\n\nRound 0 - Select agents and provide your first direction!`
+                lastMsg.toolStatus = 'success'
+                return { ...conv, messages: msgs }
+              }
+              return conv
+            })
+          )
         } else {
           // Normal LLM chat flow
           // Only send text to LLM - images are for UI display only
@@ -736,6 +790,195 @@ export function useChat(settings: Settings, models: Model[] = []) {
     setCurrentConversationId(id)
   }, [])
 
+  // RPG Game functions
+  const startRPGRound = useCallback(
+    async (conversationId: string, prompt: string) => {
+      const conversation = conversations.find(c => c.id === conversationId)
+      if (!conversation) return
+
+      const lastMessage = conversation.messages[conversation.messages.length - 1]
+      if (!lastMessage.rpgState || !lastMessage.rpgAgents) return
+
+      console.log(
+        'RPG agents model:',
+        lastMessage.rpgAgents.map(a => a.model)
+      )
+
+      setIsProcessingRPG(true)
+
+      // Create or use existing engine - always use latest agents from message
+      let engine = rpgEngine
+      if (!engine) {
+        engine = new RPGGameEngine(
+          lastMessage.rpgState.topic,
+          lastMessage.rpgAgents,
+          settings.apiKey,
+          {
+            onRoundStart: round => {
+              console.log('Round started:', round)
+            },
+            onChaosEventTriggered: event => {
+              setConversations(prev =>
+                prev.map(conv => {
+                  if (conv.id === conversationId) {
+                    const msgs = [...conv.messages]
+                    const lastMsg = msgs[msgs.length - 1]
+                    if (lastMsg.rpgRound) {
+                      lastMsg.rpgRound.chaosEvent = event
+                    }
+                    return { ...conv, messages: msgs }
+                  }
+                  return conv
+                })
+              )
+            },
+            onAgentTurnStart: agent => {
+              setConversations(prev =>
+                prev.map(conv => {
+                  if (conv.id === conversationId) {
+                    const msgs = [...conv.messages]
+                    const lastMsg = msgs[msgs.length - 1]
+                    if (lastMsg.rpgRound) {
+                      lastMsg.content = `${agent.name} is thinking...`
+                    }
+                    return { ...conv, messages: msgs }
+                  }
+                  return conv
+                })
+              )
+            },
+            onAgentChunk: (agent, chunk) => {
+              setConversations(prev =>
+                prev.map(conv => {
+                  if (conv.id === conversationId) {
+                    const msgs = [...conv.messages]
+                    const lastMsg = msgs[msgs.length - 1]
+                    if (lastMsg.rpgRound && lastMsg.rpgRound.agentTurns.length > 0) {
+                      const lastTurn =
+                        lastMsg.rpgRound.agentTurns[lastMsg.rpgRound.agentTurns.length - 1]
+                      if (lastTurn.agentId === agent.id) {
+                        lastTurn.response += chunk
+                        lastTurn.contribution =
+                          lastTurn.response
+                            .match(/CONTRIBUTION:\s*(.+?)(?=THINKING:|$)/s)?.[1]
+                            ?.trim() || lastTurn.response
+                      }
+                    }
+                    return { ...conv, messages: msgs }
+                  }
+                  return conv
+                })
+              )
+            },
+            onAgentTurnComplete: (agent, response) => {
+              setConversations(prev =>
+                prev.map(conv => {
+                  if (conv.id === conversationId) {
+                    const msgs = [...conv.messages]
+                    const lastMsg = msgs[msgs.length - 1]
+                    if (lastMsg.rpgRound) {
+                      const existingTurn = lastMsg.rpgRound.agentTurns.find(
+                        t => t.agentId === agent.id
+                      )
+                      if (!existingTurn) {
+                        lastMsg.rpgRound.agentTurns.push({
+                          agentId: agent.id,
+                          agentName: agent.customName || agent.name,
+                          prompt: '',
+                          response,
+                          contribution:
+                            response.match(/CONTRIBUTION:\s*(.+?)(?=THINKING:|$)/s)?.[1]?.trim() ||
+                            response,
+                          timestamp: Date.now()
+                        })
+                      }
+                    }
+                    return { ...conv, messages: msgs }
+                  }
+                  return conv
+                })
+              )
+            },
+            onRoundComplete: round => {
+              setConversations(prev =>
+                prev.map(conv => {
+                  if (conv.id === conversationId) {
+                    const msgs = [...conv.messages]
+                    const lastMsg = msgs[msgs.length - 1]
+                    if (lastMsg.rpgState) {
+                      lastMsg.rpgState.round = round.roundNumber
+                      lastMsg.rpgRound = round
+                      lastMsg.content = `Round ${round.roundNumber} complete! ${round.agentTurns.length} agents contributed.`
+                    }
+                    return { ...conv, messages: msgs }
+                  }
+                  return conv
+                })
+              )
+              setIsProcessingRPG(false)
+            }
+          },
+          lastMessage.rpgState.settings
+        )
+        setRpgEngine(engine)
+      }
+
+      // Restore game state and ensure agents have correct model
+      engine['state'] = lastMessage.rpgState
+      engine['agents'] = lastMessage.rpgAgents
+
+      try {
+        await engine.startRound(prompt)
+      } catch (error) {
+        console.error('RPG round error:', error)
+        setIsProcessingRPG(false)
+      }
+    },
+    [conversations, rpgEngine, settings.apiKey]
+  )
+
+  const toggleRPGChaos = useCallback((conversationId: string, enabled: boolean) => {
+    setConversations(prev =>
+      prev.map(conv => {
+        if (conv.id === conversationId) {
+          const msgs = [...conv.messages]
+          const lastMsg = msgs[msgs.length - 1]
+          if (lastMsg.rpgState) {
+            lastMsg.rpgState.settings.chaosEventsEnabled = enabled
+          }
+          return { ...conv, messages: msgs }
+        }
+        return conv
+      })
+    )
+  }, [])
+
+  const stopRPG = useCallback(() => {
+    if (rpgEngine) {
+      rpgEngine.stop()
+    }
+    setIsProcessingRPG(false)
+  }, [rpgEngine])
+
+  const completeRPG = useCallback((conversationId: string) => {
+    setConversations(prev =>
+      prev.map(conv => {
+        if (conv.id === conversationId) {
+          const msgs = [...conv.messages]
+          const lastMsg = msgs[msgs.length - 1]
+          if (lastMsg.rpgState) {
+            lastMsg.rpgState.status = 'completed'
+            lastMsg.content = `🎮 RPG Session Complete!\n\n${lastMsg.rpgState.context.story || 'Session ended.'}`
+          }
+          return { ...conv, messages: msgs }
+        }
+        return conv
+      })
+    )
+    setRpgEngine(null)
+    setIsProcessingRPG(false)
+  }, [])
+
   return {
     conversations,
     currentConversation,
@@ -743,11 +986,16 @@ export function useChat(settings: Settings, models: Model[] = []) {
     isStreaming,
     isLoading,
     storageError,
+    isProcessingRPG,
     createNewConversation,
     sendMessage,
     deleteConversation,
     renameConversation,
     stopStreaming,
-    selectConversation
+    selectConversation,
+    startRPGRound,
+    toggleRPGChaos,
+    stopRPG,
+    completeRPG
   }
 }

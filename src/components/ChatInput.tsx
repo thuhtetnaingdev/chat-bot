@@ -7,8 +7,6 @@ import {
   type ChangeEvent
 } from 'react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
@@ -16,20 +14,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Square, ArrowUp, Paperclip, X, ImageIcon } from 'lucide-react'
+import { Paperclip, X, ImageIcon, Mic, ArrowUp } from 'lucide-react'
 import { useAudioRecorder } from '@/hooks/useAudioRecorder'
-import { useAudioVisualizer } from '@/hooks/useAudioVisualizer'
-import { AudioVisualizer } from '@/components/AudioVisualizer'
-import { VoiceInputButton } from '@/components/VoiceInputButton'
 import { transcribeAudio, processImageFile, performOCR } from '@/lib/api'
-import {
-  availableTools,
-  type Tool,
-  IMAGE_MODELS,
-  VIDEO_RESOLUTIONS,
-  type Model,
-  supportsVideo
-} from '@/types'
+import { availableTools, type Tool, IMAGE_MODELS, type Model } from '@/types'
+import { cn } from '@/lib/utils'
 
 export interface ChatInputProps {
   onSend: (
@@ -63,14 +52,10 @@ export function ChatInput({
   isStreaming,
   disabled,
   apiKey = '',
-  selectedImageModel = 'z-image-turbo',
+  selectedImageModel = 'glm-image',
   onImageModelChange,
   selectedVisionModel = '',
   onVisionModelChange,
-  selectedVideoResolution = '480p',
-  onVideoResolutionChange,
-  maxAgenticIterations = 3,
-  onMaxAgenticIterationsChange,
   models = []
 }: ChatInputProps) {
   const [input, setInput] = useState('')
@@ -92,13 +77,10 @@ export function ChatInput({
     isRecording,
     audioBlob,
     error: recordingError,
-    recordingDuration,
     startRecording,
     stopRecording,
     resetRecording
   } = useAudioRecorder()
-
-  const { audioData, connectStream, disconnectStream } = useAudioVisualizer()
 
   const streamRef = useRef<MediaStream | null>(null)
   const processedBlobRef = useRef<string | null>(null)
@@ -107,13 +89,8 @@ export function ChatInput({
   useEffect(() => {
     const processTranscription = async () => {
       if (audioBlob && apiKey && !isTranscribing) {
-        // Create unique identifier for this blob
         const blobId = `${audioBlob.size}-${audioBlob.type}-${Date.now()}`
-
-        // Skip if already processed
-        if (processedBlobRef.current === blobId) {
-          return
-        }
+        if (processedBlobRef.current === blobId) return
 
         processedBlobRef.current = blobId
         setIsTranscribing(true)
@@ -140,8 +117,6 @@ export function ChatInput({
 
   // Get vision-supported models
   const visionModels = models.filter(m => m.modalities?.input?.includes('image'))
-
-  // Get the first vision model as default if none selected
   const effectiveVisionModel =
     selectedVisionModel || (visionModels.length > 0 ? visionModels[0].id : '')
 
@@ -156,13 +131,12 @@ export function ChatInput({
     ) {
       const activeTool = getActiveTool()
 
-      // If using @vision tool, don't do OCR - send images to LLM directly
+      // Handle different tools
       if (activeTool === 'vision') {
         if (selectedImages.length === 0) {
           setTranscriptionError('Please upload at least one image for vision analysis')
           return
         }
-
         await onSend(
           input.trim(),
           selectedImages,
@@ -175,20 +149,17 @@ export function ChatInput({
         return
       }
 
-      // If using @edit_image tool, don't do OCR - send images for editing
       if (activeTool === 'edit_image') {
         if (selectedImages.length === 0) {
           setTranscriptionError('Please upload at least one image to edit')
           return
         }
-
         await onSend(input.trim(), selectedImages, activeTool, undefined, selectedImageModel)
         setInput('')
         setSelectedImages([])
         return
       }
 
-      // If using @create_video tool, don't do OCR - send images for video generation (optional)
       if (activeTool === 'create_video') {
         await onSend(
           input.trim(),
@@ -202,7 +173,6 @@ export function ChatInput({
         return
       }
 
-      // If using @agentic_image tool, pass images for edit mode if provided
       if (activeTool === 'agentic_image') {
         await onSend(
           input.trim(),
@@ -211,39 +181,36 @@ export function ChatInput({
           effectiveVisionModel,
           selectedImageModel,
           undefined,
-          maxAgenticIterations
+          3
         )
         setInput('')
         setSelectedImages([])
         return
       }
 
-      // If using @agentic_video tool, images are mandatory
       if (activeTool === 'agentic_video') {
         if (selectedImages.length === 0) {
           setTranscriptionError('Please upload at least one image for agentic video generation')
           return
         }
-
         await onSend(
           input.trim(),
           selectedImages,
           activeTool,
           effectiveVisionModel,
           undefined,
-          selectedVideoResolution,
-          maxAgenticIterations
+          '480p',
+          3
         )
         setInput('')
         setSelectedImages([])
         return
       }
 
-      // If there are images, process OCR in background first (for non-vision tools)
+      // Standard text/image processing with OCR
       if (selectedImages.length > 0 && apiKey) {
         setIsProcessingOCR(true)
         try {
-          // Process all images with OCR
           const ocrResults: string[] = []
           for (const img of selectedImages) {
             let ocrText = ''
@@ -255,7 +222,6 @@ export function ChatInput({
             }
           }
 
-          // Combine user input with OCR results
           let finalMessage = input.trim()
           if (ocrResults.length > 0) {
             const ocrCombined = ocrResults.join('\n\n')
@@ -276,7 +242,6 @@ export function ChatInput({
           setIsProcessingOCR(false)
         }
       } else {
-        // No images, just send text
         await onSend(input.trim(), undefined, activeTool)
         setInput('')
       }
@@ -293,7 +258,6 @@ export function ChatInput({
 
     try {
       for (const file of Array.from(files)) {
-        // For vision mode, accept both images and videos
         if (isVisionMode) {
           if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue
         } else {
@@ -309,7 +273,6 @@ export function ChatInput({
       console.error('File processing error:', error)
       setTranscriptionError('Failed to process file')
     } finally {
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -342,7 +305,6 @@ export function ChatInput({
       processedBlobRef.current = null
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      connectStream(stream)
       startRecording()
     } catch (err) {
       console.error('Failed to access microphone:', err)
@@ -354,7 +316,6 @@ export function ChatInput({
 
   const handleStopRecording = () => {
     stopRecording()
-    disconnectStream()
 
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
@@ -404,7 +365,6 @@ export function ChatInput({
       setInput(newInput)
       setShowToolSuggestions(false)
 
-      // Focus textarea and set cursor after the inserted mention
       setTimeout(() => {
         textareaRef.current?.focus()
         const newCursorPos = mentionStartIndex + tool.id.length + 2
@@ -458,286 +418,94 @@ export function ChatInput({
     disabled || isStreaming || isTranscribing || isRecording || isProcessingOCR
 
   return (
-    <div className="border-t border-border/30 bg-card/50 backdrop-blur-xl">
-      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-3 sm:py-4">
+    <div className="border-t border-border/50 bg-background">
+      <div className="max-w-3xl mx-auto px-4 py-4">
+        {/* Error Message */}
+        {(transcriptionError || recordingError) && (
+          <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
+            <p className="text-xs text-destructive line-clamp-2">
+              {transcriptionError || recordingError}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleClearError}
+              className="h-7 text-xs hover:bg-destructive/20 shrink-0"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {/* Selected Images Preview */}
+        {selectedImages.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {selectedImages.map((img, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={img}
+                  alt={`Selected ${index + 1}`}
+                  className="h-14 w-14 object-cover rounded-lg border border-border"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveImage(index)}
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tool-specific UI */}
+        {activeTool === 'create_image' && (
+          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Image Model:</span>
+            <Select value={selectedImageModel} onValueChange={onImageModelChange}>
+              <SelectTrigger className="h-7 w-[140px] text-xs border-0 bg-muted/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {IMAGE_MODELS.map(model => (
+                  <SelectItem key={model.id} value={model.id} className="text-xs">
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {activeTool === 'vision' && visionModels.length > 0 && (
+          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Vision Model:</span>
+            <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
+              <SelectTrigger className="h-7 w-[160px] text-xs border-0 bg-muted/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {visionModels.map(model => (
+                  <SelectItem key={model.id} value={model.id} className="text-xs">
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Main Input */}
         <form onSubmit={handleSubmit}>
-          {/* Error Message */}
-          {(transcriptionError || recordingError) && (
-            <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20 shadow-sm">
-              <p className="text-xs text-destructive line-clamp-2">
-                {transcriptionError || recordingError}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleClearError}
-                className="h-7 text-xs hover:bg-destructive/20 shrink-0"
-              >
-                Dismiss
-              </Button>
-            </div>
-          )}
-
-          {/* Selected Images Preview */}
-          {selectedImages.length > 0 && (
-            <div className="mb-2 sm:mb-3 flex flex-wrap gap-1.5 sm:gap-2">
-              {selectedImages.map((img, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={img}
-                    alt={`Selected ${index + 1}`}
-                    className="h-12 w-12 sm:h-16 sm:w-16 object-cover rounded-lg border border-border/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveImage(index)}
-                    className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Model Selector for Image Generation */}
-          {activeTool === 'create_image' && (
-            <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                Image Model:
-              </span>
-              <Select value={selectedImageModel} onValueChange={onImageModelChange}>
-                <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {IMAGE_MODELS.map(model => (
-                    <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
-                      {model.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Model Selector for Vision */}
-          {activeTool === 'vision' && visionModels.length > 0 && (
-            <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                Vision Model:
-              </span>
-              <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
-                <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {visionModels.map(model => (
-                    <SelectItem key={model.id} value={model.id} className="text-[10px] sm:text-xs">
-                      {model.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Resolution Selector for Video Generation */}
-          {activeTool === 'create_video' && (
-            <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                Resolution:
-              </span>
-              <Select value={selectedVideoResolution} onValueChange={onVideoResolutionChange}>
-                <SelectTrigger className="w-[100px] sm:w-[120px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {VIDEO_RESOLUTIONS.map(res => (
-                    <SelectItem key={res.id} value={res.id} className="text-[10px] sm:text-xs">
-                      {res.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Model Selectors for Agentic Image */}
-          {activeTool === 'agentic_image' && (
-            <div className="mb-2 flex flex-wrap items-center gap-3 px-1">
-              {/* Show Image Model only when no images uploaded (create mode) */}
-              {selectedImages.length === 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                    Image Model:
-                  </span>
-                  <Select value={selectedImageModel} onValueChange={onImageModelChange}>
-                    <SelectTrigger className="w-[120px] sm:w-[160px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {IMAGE_MODELS.map(model => (
-                        <SelectItem
-                          key={model.id}
-                          value={model.id}
-                          className="text-[10px] sm:text-xs"
-                        >
-                          {model.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="relative">
+            <div
+              className={cn(
+                'flex items-center gap-2 rounded-full bg-muted/50 border border-border/50 p-2 transition-all',
+                'focus-within:border-primary/50 focus-within:bg-muted'
               )}
-              {/* Show Edit Mode badge when images uploaded */}
-              {selectedImages.length > 0 && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
-                  <span className="text-[10px] sm:text-xs font-medium text-primary">Edit Mode</span>
-                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">
-                    ({selectedImages.length} image{selectedImages.length > 1 ? 's' : ''})
-                  </span>
-                </div>
-              )}
-              {/* Always show Vision Model selector */}
-              {visionModels.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                    Vision Model:
-                  </span>
-                  <Select value={effectiveVisionModel} onValueChange={onVisionModelChange}>
-                    <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {visionModels.map(model => (
-                        <SelectItem
-                          key={model.id}
-                          value={model.id}
-                          className="text-[10px] sm:text-xs"
-                        >
-                          {model.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {/* Max Iterations Slider */}
-              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground whitespace-nowrap">
-                  Max Iterations:
-                </span>
-                <div className="flex items-center gap-2 flex-1">
-                  <Slider
-                    value={[maxAgenticIterations]}
-                    onValueChange={value => onMaxAgenticIterationsChange?.(value[0])}
-                    max={10}
-                    min={1}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <span className="text-[10px] sm:text-xs font-medium text-foreground w-6 text-center">
-                    {maxAgenticIterations}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Model Selectors for Agentic Video */}
-          {activeTool === 'agentic_video' && (
-            <div className="mb-2 flex flex-wrap items-center gap-3 px-1">
-              {/* Show Image reference badge - required */}
-              {selectedImages.length > 0 ? (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
-                  <span className="text-[10px] sm:text-xs font-medium text-primary">Image</span>
-                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">
-                    ({selectedImages.length} uploaded)
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-destructive/10 border border-destructive/20">
-                  <span className="text-[10px] sm:text-xs font-medium text-destructive">
-                    Image Required
-                  </span>
-                </div>
-              )}
-              {/* Resolution selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                  Resolution:
-                </span>
-                <Select value={selectedVideoResolution} onValueChange={onVideoResolutionChange}>
-                  <SelectTrigger className="w-[100px] sm:w-[120px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VIDEO_RESOLUTIONS.map(res => (
-                      <SelectItem key={res.id} value={res.id} className="text-[10px] sm:text-xs">
-                        {res.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* Vision Model selector - only show video-supporting models */}
-              {(() => {
-                const videoVisionModels = models.filter(m => supportsVideo(m))
-                const effectiveVideoVisionModel =
-                  selectedVisionModel ||
-                  (videoVisionModels.length > 0 ? videoVisionModels[0].id : '')
-                return videoVisionModels.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] sm:text-xs font-medium text-muted-foreground">
-                      Vision Model:
-                    </span>
-                    <Select value={effectiveVideoVisionModel} onValueChange={onVisionModelChange}>
-                      <SelectTrigger className="w-[140px] sm:w-[200px] h-7 sm:h-8 text-[10px] sm:text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {videoVisionModels.map(model => (
-                          <SelectItem
-                            key={model.id}
-                            value={model.id}
-                            className="text-[10px] sm:text-xs"
-                          >
-                            {model.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null
-              })()}
-              {/* Max Iterations Slider */}
-              <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground whitespace-nowrap">
-                  Max Iterations:
-                </span>
-                <div className="flex items-center gap-2 flex-1">
-                  <Slider
-                    value={[maxAgenticIterations]}
-                    onValueChange={value => onMaxAgenticIterationsChange?.(value[0])}
-                    max={10}
-                    min={1}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <span className="text-[10px] sm:text-xs font-medium text-foreground w-6 text-center">
-                    {maxAgenticIterations}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Main Input Area - Mobile: stacked, Desktop: side by side */}
-          <div className="flex flex-col gap-2">
-            {/* Text Input Row */}
-            <div className="flex items-end gap-1.5 sm:gap-2">
+            >
               {/* File Upload Button */}
               <input
                 type="file"
@@ -753,97 +521,87 @@ export function ChatInput({
                 size="icon"
                 onClick={handleFileButtonClick}
                 disabled={disabled || isStreaming || isRecording || isTranscribing || !apiKey}
-                className="h-12 w-12 sm:h-[64px] sm:w-[64px] shrink-0 rounded-lg border border-border/50 hover:bg-accent/50 disabled:opacity-50"
+                className="h-9 w-9 rounded-full shrink-0 hover:bg-muted-foreground/10"
               >
-                <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Paperclip className="h-5 w-5 text-muted-foreground" />
               </Button>
-
-              {/* Voice Button */}
-              <VoiceInputButton
-                isRecording={isRecording}
-                isTranscribing={isTranscribing}
-                onStartRecording={handleStartRecording}
-                onStopRecording={handleStopRecording}
-                disabled={disabled || isStreaming}
-                recordingDuration={recordingDuration}
-              />
 
               {/* Text Input */}
               <div className="flex-1 min-w-0 relative">
-                <div className="relative border border-border/30 rounded-xl bg-background/80 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all shadow-sm">
-                  <Textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    onClick={handleTextareaClick}
-                    placeholder={
-                      isRecording
-                        ? 'Recording...'
-                        : isProcessingOCR
-                          ? 'Extracting text...'
-                          : selectedImages.length > 0
-                            ? `${selectedImages.length} image(s)`
-                            : 'Type message...'
-                    }
-                    disabled={isInputDisabled}
-                    className="min-h-[48px] sm:min-h-[56px] max-h-[120px] sm:max-h-[180px] resize-none border-0 bg-transparent px-4 py-3 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
-                    rows={2}
-                  />
-                  {input.length > 0 && (
-                    <div className="absolute bottom-2.5 right-3 text-[10px] text-muted-foreground/60">
-                      {input.length}
-                    </div>
-                  )}
-                </div>
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onClick={handleTextareaClick}
+                  placeholder={
+                    isRecording
+                      ? 'Recording...'
+                      : isProcessingOCR
+                        ? 'Extracting text...'
+                        : 'How can I help you today?'
+                  }
+                  disabled={isInputDisabled}
+                  className="w-full min-h-[40px] max-h-[120px] resize-none bg-transparent border-0 px-1 py-0 text-sm leading-[40px] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
+                  rows={1}
+                  onInput={e => {
+                    const target = e.target as HTMLTextAreaElement
+                    target.style.height = 'auto'
+                    target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                  }}
+                />
 
-                {/* Tool Suggestions Popup - Mobile optimized */}
+                {/* Tool Suggestions Popup */}
                 {showToolSuggestions && filteredTools.length > 0 && (
-                  <div className="absolute bottom-full left-0 right-0 sm:left-0 sm:right-auto mb-2 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
-                    <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/50 border-b border-border">
-                      <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-                        Tools
-                      </p>
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
+                    <div className="px-3 py-2 bg-muted/50 border-b border-border">
+                      <p className="text-xs text-muted-foreground font-medium">Tools</p>
                     </div>
-                    <div className="max-h-36 sm:max-h-48 overflow-y-auto">
+                    <div className="max-h-48 overflow-y-auto">
                       {filteredTools.map((tool, index) => (
                         <button
                           key={tool.id}
                           type="button"
                           onClick={() => insertToolMention(tool)}
-                          className={`w-full px-2 sm:px-3 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-3 text-left transition-colors hover:bg-accent ${
-                            index === selectedToolIndex ? 'bg-accent' : ''
-                          }`}
+                          className={cn(
+                            'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
+                            index === selectedToolIndex
+                              ? 'bg-primary/20 hover:bg-primary/30'
+                              : 'hover:bg-muted'
+                          )}
                         >
-                          <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <ImageIcon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <ImageIcon className="h-4 w-4 text-primary" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs sm:text-sm font-medium truncate">{tool.name}</p>
-                            <p className="text-[9px] sm:text-xs text-muted-foreground truncate">
+                            <p className="text-sm font-medium truncate">{tool.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
                               {tool.description}
                             </p>
                           </div>
                         </button>
                       ))}
                     </div>
-                    <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-muted/30 border-t border-border flex items-center justify-between">
-                      <p className="text-[9px] sm:text-[10px] text-muted-foreground">
-                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">
-                          ↑↓
-                        </kbd>{' '}
-                        to navigate
-                      </p>
-                      <p className="text-[9px] sm:text-[10px] text-muted-foreground">
-                        <kbd className="px-1 py-0.5 rounded bg-muted border border-border font-mono">
-                          Enter
-                        </kbd>{' '}
-                        to select
-                      </p>
-                    </div>
                   </div>
                 )}
               </div>
+
+              {/* Voice Button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={isRecording ? handleStopRecording : handleStartRecording}
+                disabled={disabled || isStreaming || isTranscribing}
+                className={cn(
+                  'h-9 w-9 rounded-full shrink-0',
+                  isRecording
+                    ? 'bg-destructive/20 text-destructive hover:bg-destructive/30'
+                    : 'hover:bg-muted-foreground/10'
+                )}
+              >
+                <Mic className={cn('h-5 w-5', isRecording && 'animate-pulse')} />
+              </Button>
 
               {/* Send Button */}
               {!isStreaming ? (
@@ -856,7 +614,7 @@ export function ChatInput({
                     isTranscribing ||
                     isProcessingOCR
                   }
-                  className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 rounded-xl border border-primary/30 bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:from-primary/90 hover:to-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
+                  className="h-9 w-9 rounded-full shrink-0 p-0 bg-primary hover:bg-primary/90 disabled:opacity-50"
                 >
                   <ArrowUp className="h-5 w-5" />
                 </Button>
@@ -865,67 +623,10 @@ export function ChatInput({
                   type="button"
                   onClick={onStop}
                   variant="destructive"
-                  disabled={isRecording || isTranscribing}
-                  className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 rounded-xl border border-destructive/30 bg-gradient-to-br from-destructive to-destructive/90 text-destructive-foreground shadow-lg shadow-destructive/25 hover:shadow-destructive/40 hover:from-destructive/90 hover:to-destructive disabled:opacity-50 disabled:cursor-not-allowed transition-all p-0"
+                  className="h-9 w-9 rounded-full shrink-0 p-0"
                 >
-                  <Square className="h-5 w-5" />
+                  <div className="h-3 w-3 bg-white rounded-sm" />
                 </Button>
-              )}
-            </div>
-
-            {/* Audio Visualizer - Full width on mobile */}
-            {isRecording && audioData && (
-              <div className="h-8 sm:h-10 rounded-lg bg-muted/30 border border-border/30 overflow-hidden">
-                <AudioVisualizer audioData={audioData} isActive={isRecording} barCount={24} />
-              </div>
-            )}
-
-            {/* Helper Text - Stacked on mobile, horizontal on desktop */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-[9px] sm:text-[10px] text-muted-foreground px-0.5">
-              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                <span className="whitespace-nowrap">
-                  <kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">
-                    Enter
-                  </kbd>{' '}
-                  to send
-                </span>
-                <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                <span className="whitespace-nowrap">
-                  <kbd className="px-1 py-0.5 rounded bg-muted border border-border/50 font-mono text-[9px]">
-                    Shift+Enter
-                  </kbd>{' '}
-                  new line
-                </span>
-                {isRecording && (
-                  <>
-                    <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                    <span className="text-destructive font-medium whitespace-nowrap">
-                      Recording...
-                    </span>
-                  </>
-                )}
-                {isTranscribing && (
-                  <>
-                    <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                    <span className="text-primary font-medium whitespace-nowrap">
-                      Transcribing...
-                    </span>
-                  </>
-                )}
-                {isProcessingOCR && (
-                  <>
-                    <span className="text-muted-foreground/30 hidden sm:inline">|</span>
-                    <span className="text-primary font-medium whitespace-nowrap">
-                      Processing OCR...
-                    </span>
-                  </>
-                )}
-              </div>
-              {disabled && !isRecording && !isTranscribing && !isProcessingOCR && (
-                <div className="flex items-center gap-1.5 sm:justify-end">
-                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
-                  <span>API key required</span>
-                </div>
               )}
             </div>
           </div>

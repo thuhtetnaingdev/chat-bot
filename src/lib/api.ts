@@ -1,18 +1,48 @@
-import { type Model, IMAGE_MODELS, type VisionVerification, type ImageAnalysis } from '@/types'
+import { type Model, type VisionVerification, type ImageAnalysis } from '@/types'
 import { resizeImageForAPI } from './imageCompression'
-
-const LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
+const DEFAULT_LLM_API_URL = 'https://llm.chutes.ai/v1/chat/completions'
 const MODELS_URL = 'https://models.dev/api.json'
 const WHISPER_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe'
 const KOKORO_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak'
 const VIDEO_GENERATION_URL = 'https://chutes-wan-2-2-i2v-14b-fast.chutes.ai/generate'
+const IMAGE_GENERATION_URL = 'https://api.novita.ai/v3/async/glm-image'
+const IMAGE_EDIT_URL = 'https://api.novita.ai/v3/seedream-5.0-lite'
+const CHAT_COMPLETIONS_PATH = '/chat/completions'
+const DEFAULT_PROVIDER_ID = 'chutes'
+const DEFAULT_PROVIDER_NAME = 'Chutes'
+const SEEDREAM_MIN_PIXELS = 3_686_400
+const SEEDREAM_SIZE_MULTIPLE = 64
+const SEEDREAM_FALLBACK_SIZE = 2048
+
+let modelRegistry: Model[] = []
 
 const DEFAULT_VIDEO_NEGATIVE_PROMPT =
   '色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走'
 
-const getImageGenerationUrl = (modelId: string): string => {
-  const model = IMAGE_MODELS.find(m => m.id === modelId)
-  return model?.url || 'https://chutes-z-image-turbo.chutes.ai/generate'
+const getImageGenerationUrl = (): string => IMAGE_GENERATION_URL
+
+const normalizeApiBase = (api?: string): string | undefined => {
+  if (!api) return undefined
+  return api.replace(/\/+$/, '')
+}
+
+const getChatCompletionsUrl = (modelId?: string): string => {
+  if (!modelId) return DEFAULT_LLM_API_URL
+
+  const model = modelRegistry.find(entry => entry.id === modelId)
+  const apiBase = normalizeApiBase(model?.providerApi)
+
+  if (!apiBase) {
+    return DEFAULT_LLM_API_URL
+  }
+
+  return apiBase.endsWith(CHAT_COMPLETIONS_PATH)
+    ? apiBase
+    : `${apiBase}${CHAT_COMPLETIONS_PATH}`
+}
+
+export const setModelRegistry = (models: Model[]): void => {
+  modelRegistry = models
 }
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -101,17 +131,83 @@ const fileToBase64 = (file: File): Promise<string> => {
   })
 }
 
+const roundUpToMultiple = (value: number, multiple: number): number => {
+  return Math.ceil(value / multiple) * multiple
+}
+
+const getImageDimensions = (base64Image: string): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height })
+    }
+    img.onerror = () => {
+      reject(new Error('Failed to load image for dimensions'))
+    }
+    img.src = base64Image
+  })
+}
+
+const getSeedreamTargetSize = (width: number, height: number): { width: number; height: number } => {
+  if (width <= 0 || height <= 0) {
+    return { width: SEEDREAM_FALLBACK_SIZE, height: SEEDREAM_FALLBACK_SIZE }
+  }
+
+  const scale = Math.max(1, Math.sqrt(SEEDREAM_MIN_PIXELS / (width * height)))
+  const scaledWidth = roundUpToMultiple(Math.ceil(width * scale), SEEDREAM_SIZE_MULTIPLE)
+  const scaledHeight = roundUpToMultiple(Math.ceil(height * scale), SEEDREAM_SIZE_MULTIPLE)
+
+  return { width: scaledWidth, height: scaledHeight }
+}
+
+const resizeImageToTargetSize = async (
+  base64Image: string,
+  width: number,
+  height: number,
+  quality: number = 0.9
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context for resize'))
+        return
+      }
+
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(img, 0, 0, width, height)
+
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+
+    img.onerror = () => {
+      reject(new Error('Failed to load image for resizing'))
+    }
+
+    img.src = base64Image
+  })
+}
+
 export const generateImage = async (
   prompt: string,
   apiKey: string,
-  imageModel = 'z-image-turbo'
+  imageModel = 'glm-image'
 ): Promise<string> => {
+  void imageModel
+
   if (!apiKey) {
     throw new Error('API key required for image generation')
   }
 
   try {
-    const response = await fetch(getImageGenerationUrl(imageModel), {
+    const response = await fetch(getImageGenerationUrl(), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -165,22 +261,6 @@ export const generateImage = async (
   }
 }
 
-// Helper function to get image dimensions from base64 data URL
-export const getImageDimensions = (
-  base64Image: string
-): Promise<{ width: number; height: number }> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      resolve({ width: img.width, height: img.height })
-    }
-    img.onerror = () => {
-      reject(new Error('Failed to load image to get dimensions'))
-    }
-    img.src = base64Image
-  })
-}
-
 export const editImage = async (
   prompt: string,
   images: string[],
@@ -195,27 +275,25 @@ export const editImage = async (
   }
 
   try {
-    // Resize images if needed to avoid API limits
-    const resizedImages = await Promise.all(images.map(img => resizeImageForAPI(img, 1536)))
+    const sourceDimensions = await getImageDimensions(images[0])
+    const targetSize = getSeedreamTargetSize(sourceDimensions.width, sourceDimensions.height)
+    const resizedImages = await Promise.all(
+      images.map(img => resizeImageToTargetSize(img, targetSize.width, targetSize.height, 0.9))
+    )
 
-    // Get dimensions from the first resized image
-    const dimensions = await getImageDimensions(resizedImages[0])
-
-    // Strip data URL prefix from images (e.g., "data:image/png;base64," -> "")
-    const cleanImages = resizedImages.map(img => {
-      const commaIndex = img.indexOf(',')
-      return commaIndex !== -1 ? img.slice(commaIndex + 1) : img
-    })
-
-    // Build request body with resized image dimensions
+    // Seedream expects "image" as data URLs with a "size" string that matches target output.
+    const size = `${targetSize.width}x${targetSize.height}`
     const requestBody: Record<string, unknown> = {
       prompt,
-      image_b64s: cleanImages,
-      width: dimensions.width,
-      height: dimensions.height
+      image: resizedImages,
+      size,
+      optimize_prompt_options: { mode: 'standard' },
+      sequential_image_generation: 'disabled',
+      sequential_image_generation_options: { max_images: 15 },
+      watermark: false
     }
 
-    const response = await fetch('https://chutes-qwen-image-edit-2511.chutes.ai/generate', {
+    const response = await fetch(IMAGE_EDIT_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -361,7 +439,7 @@ If satisfied is false, list SPECIFIC issues and provide a PRECISE edit prompt th
   }
 
   try {
-    const response = await fetch(LLM_API_URL, {
+    const response = await fetch(getChatCompletionsUrl(visionModel), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -531,7 +609,7 @@ OUTPUT ONLY JSON. No explanations. Example:
   }
 
   try {
-    const response = await fetch(LLM_API_URL, {
+    const response = await fetch(getChatCompletionsUrl(visionModel), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -837,7 +915,7 @@ ${
 Create a simple, effective edit prompt that addresses the issues while preserving unchanged elements. Keep it short and natural.`
 
   try {
-    const response = await fetch(LLM_API_URL, {
+    const response = await fetch(getChatCompletionsUrl(model), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -940,7 +1018,7 @@ If satisfied is false, list specific issues and provide a clear edit prompt to a
   }
 
   try {
-    const response = await fetch(LLM_API_URL, {
+    const response = await fetch(getChatCompletionsUrl(visionModel), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -1186,7 +1264,7 @@ export const performOCR = async (
   }
 
   try {
-    const response = await fetch(LLM_API_URL, {
+    const response = await fetch(getChatCompletionsUrl('rednote-hilab/dots.ocr'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -1255,36 +1333,55 @@ export const fetchModels = async (): Promise<Model[]> => {
       throw new Error(`API returned ${response.status}`)
     }
 
-    const data = await response.json()
+    const data = (await response.json()) as Record<
+      string,
+      {
+        name?: string
+        api?: string
+        models?: Record<
+          string,
+          {
+            id?: string
+            name?: string
+            cost?: unknown
+            limit?: { output?: number }
+            modalities?: { input?: string[]; output?: string[] }
+          }
+        >
+      }
+    >
     console.log('API Response:', data)
-    const chutesModels = data.chutes?.models || {}
-    const modelsArray = Object.values(chutesModels).map((model: unknown): Model => {
-      const m = model as {
-        id: string
-        name: string
-        cost: unknown
-        limit?: { output?: number }
-        modalities?: { input?: string[]; output?: string[] }
-      }
-      const costModel = m.cost
-      const cost =
-        typeof costModel === 'object' && costModel !== null && 'input' in costModel
-          ? ((costModel as { input?: number }).input ?? 0)
-          : 0
-      return {
-        id: m.id,
-        name: m.name,
-        cost,
-        max_tokens: m.limit?.output,
-        modalities: m.modalities
-          ? {
-              input: m.modalities.input || [],
-              output: m.modalities.output || []
-            }
-          : undefined
-      }
+    const modelsArray = Object.entries(data).flatMap(([providerId, provider]) => {
+      const providerModels = provider?.models || {}
+
+      return Object.values(providerModels).map((model): Model => {
+        const costModel = model.cost
+        const cost =
+          typeof costModel === 'object' && costModel !== null && 'input' in costModel
+            ? ((costModel as { input?: number }).input ?? 0)
+            : typeof costModel === 'number'
+              ? costModel
+              : 0
+
+        return {
+          id: model.id || '',
+          name: model.name || model.id || 'Unknown Model',
+          cost,
+          providerId,
+          providerName: provider.name || providerId,
+          providerApi: provider.api,
+          max_tokens: model.limit?.output,
+          modalities: model.modalities
+            ? {
+                input: model.modalities.input || [],
+                output: model.modalities.output || []
+              }
+            : undefined
+        }
+      })
     })
     console.log('Fetched models:', modelsArray)
+    setModelRegistry(modelsArray)
     return modelsArray
   } catch (error) {
     console.error('Failed to fetch models:', error)
@@ -1296,30 +1393,45 @@ export const fetchModels = async (): Promise<Model[]> => {
         id: 'unsloth/gemma-3-27b-it',
         name: 'Unsloth Gemma 3 27B IT',
         cost: 0.5,
+        providerId: DEFAULT_PROVIDER_ID,
+        providerName: DEFAULT_PROVIDER_NAME,
+        providerApi: 'https://llm.chutes.ai/v1',
         max_tokens: 65536
       },
       {
         id: 'meta-llama/Llama-3.3-8B-Instruct',
         name: 'Meta Llama 3.3 8B Instruct',
         cost: 0.25,
+        providerId: DEFAULT_PROVIDER_ID,
+        providerName: DEFAULT_PROVIDER_NAME,
+        providerApi: 'https://llm.chutes.ai/v1',
         max_tokens: 8192
       },
       {
         id: 'deepseek-ai/DeepSeek-R1',
         name: 'DeepSeek R1',
         cost: 1.0,
+        providerId: DEFAULT_PROVIDER_ID,
+        providerName: DEFAULT_PROVIDER_NAME,
+        providerApi: 'https://llm.chutes.ai/v1',
         max_tokens: 65536
       },
       {
         id: 'Qwen/Qwen2.5-72B-Instruct',
         name: 'Qwen 2.5 72B Instruct',
         cost: 0.75,
+        providerId: DEFAULT_PROVIDER_ID,
+        providerName: DEFAULT_PROVIDER_NAME,
+        providerApi: 'https://llm.chutes.ai/v1',
         max_tokens: 32768
       },
       {
         id: 'mistralai/Mistral-Nemo',
         name: 'Mistral Nemo',
         cost: 0.3,
+        providerId: DEFAULT_PROVIDER_ID,
+        providerName: DEFAULT_PROVIDER_NAME,
+        providerApi: 'https://llm.chutes.ai/v1',
         max_tokens: 131072
       }
     ]
@@ -1346,7 +1458,7 @@ export const chatWithLLM = async (
   max_tokens?: number
 ): Promise<string> => {
   if (!apiKey) {
-    throw new Error('Chutes API key not found. Please add your API key in the settings.')
+    throw new Error('API key not found. Please add your provider API key in the settings.')
   }
 
   const requestBody = {
@@ -1358,7 +1470,7 @@ export const chatWithLLM = async (
   }
 
   try {
-    const response = await fetch(LLM_API_URL, {
+    const response = await fetch(getChatCompletionsUrl(model), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
