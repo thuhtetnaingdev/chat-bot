@@ -64,36 +64,48 @@ export function ConversationList({
   return (
     <>
       <ScrollArea className="flex-1">
-        <div className="px-3 space-y-0.5">
+        <div className="space-y-0.5 p-2">
           {conversations.map(conversation => (
             <div
               key={conversation.id}
               className={cn(
-                'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 cursor-pointer transition-colors',
+                'group relative flex items-start gap-2 rounded-lg p-2.5 transition-all duration-200 border border-transparent',
                 currentConversationId === conversation.id
-                  ? 'bg-sidebar-accent text-sidebar-foreground'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                  ? 'bg-sidebar-accent/20 border-sidebar-accent/40 text-sidebar-accent-foreground'
+                  : 'hover:bg-sidebar-accent/10 hover:border-sidebar-accent/20 hover:text-sidebar-accent-foreground text-sidebar-foreground/70'
               )}
               onMouseEnter={() => setHoveredId(conversation.id)}
               onMouseLeave={() => setHoveredId(null)}
               onClick={() => handleConversationClick(conversation.id)}
             >
-              <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
-              <p className="flex-1 text-sm truncate">{conversation.title}</p>
+              <MessageSquare className="h-4 w-4 shrink-0 mt-0.5 opacity-70 group-hover:opacity-100 transition-opacity" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate leading-relaxed">
+                  {conversation.title.slice(0, 15)}
+                  {conversation.title.length > 15 ? '...' : ''}
+                </p>
+              </div>
 
               {(hoveredId === conversation.id || currentConversationId === conversation.id) && (
-                <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div
+                  className={cn(
+                    'flex gap-0.5 shrink-0',
+                    currentConversationId === conversation.id
+                      ? 'opacity-100'
+                      : 'opacity-0 transition-opacity group-hover:opacity-100'
+                  )}
+                >
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs"
                     onClick={e => handleRenameClick(conversation, e)}
-                    className="h-6 w-6 hover:bg-sidebar-accent/70"
+                    className="h-6 w-6 hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground"
                   >
                     <Edit2 className="h-3 w-3" />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs"
                     onClick={e => handleDeleteClick(conversation.id, e)}
                     className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                   >
@@ -106,14 +118,15 @@ export function ConversationList({
 
           {conversations.length === 0 && (
             <div className="py-8 text-center">
-              <p className="text-xs text-sidebar-foreground/50">No conversations yet</p>
+              <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+              <p className="text-xs text-muted-foreground/70">No conversations yet</p>
             </div>
           )}
         </div>
       </ScrollArea>
 
       <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-        <DialogContent className="sm:max-w-[400px] border-border">
+        <DialogContent className="sm:max-w-[400px] border-border/50">
           <DialogHeader>
             <DialogTitle className="text-sm">Rename Conversation</DialogTitle>
           </DialogHeader>

@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { RPGGameDisplay } from '@/components/rpg'
 import {
   ChevronDown,
   ChevronRight,
@@ -32,11 +31,6 @@ import { textToSpeech } from '@/lib/api'
 interface MessageBubbleProps {
   message: Message
   apiKey?: string
-  isProcessingRPG?: boolean
-  onRPGSubmit?: (prompt: string) => void
-  onRPGToggleChaos?: (enabled: boolean) => void
-  onRPGStop?: () => void
-  onRPGComplete?: () => void
 }
 
 // Image Preview Modal Component
@@ -69,7 +63,10 @@ function ImagePreviewModal({
       </div>
 
       {/* Image container */}
-      <div className="relative max-w-[90vw] max-h-[80vh]" onClick={e => e.stopPropagation()}>
+      <div 
+        className="relative max-w-[90vw] max-h-[80vh]"
+        onClick={e => e.stopPropagation()}
+      >
         <img
           src={src}
           alt="Preview"
@@ -175,15 +172,7 @@ function stripMarkdown(text: string): string {
   )
 }
 
-export function MessageBubble({
-  message,
-  apiKey,
-  isProcessingRPG,
-  onRPGSubmit,
-  onRPGToggleChaos,
-  onRPGStop,
-  onRPGComplete
-}: MessageBubbleProps) {
+export function MessageBubble({ message, apiKey }: MessageBubbleProps) {
   const contentText = typeof message.content === 'string' ? message.content : ''
   const { thinking, response, isThinking } = parseThinkingContent(contentText)
   // Auto-expand thinking while streaming, collapse when done
@@ -809,24 +798,6 @@ export function MessageBubble({
                           </div>
                         )}
                       </div>
-                    )}
-
-                    {/* RPG Game Display */}
-                    {message.rpgState && message.rpgAgents && (
-                      <RPGGameDisplay
-                        gameState={message.rpgState}
-                        round={message.rpgRound}
-                        isUserTurn={
-                          !message.rpgRound ||
-                          message.rpgRound.agentTurns.length === message.rpgAgents.length
-                        }
-                        isProcessing={isProcessingRPG || false}
-                        agents={message.rpgAgents}
-                        onUserSubmit={onRPGSubmit || (() => {})}
-                        onStop={onRPGStop || (() => {})}
-                        onComplete={onRPGComplete || (() => {})}
-                        onToggleChaos={onRPGToggleChaos || (() => {})}
-                      />
                     )}
 
                     <div

@@ -12,9 +12,8 @@ export const loadSettings = (): Settings => {
     return {
       apiKey: '',
       instructions: '',
-      selectedProvider: 'chutes',
       selectedModel: 'unsloth/gemma-3-27b-it',
-      selectedImageModel: 'glm-image',
+      selectedImageModel: 'z-image-turbo',
       selectedVisionModel: '',
       selectedVideoResolution: '480p',
       maxAgenticIterations: 3
@@ -22,12 +21,6 @@ export const loadSettings = (): Settings => {
   }
   try {
     const parsed = JSON.parse(data)
-    if (!parsed.selectedProvider) {
-      parsed.selectedProvider = 'chutes'
-    }
-    if (parsed.selectedImageModel !== 'glm-image') {
-      parsed.selectedImageModel = 'glm-image'
-    }
     // Ensure selectedVideoResolution has a default value
     if (!parsed.selectedVideoResolution) {
       parsed.selectedVideoResolution = '480p'
@@ -45,9 +38,8 @@ export const loadSettings = (): Settings => {
     return {
       apiKey: '',
       instructions: '',
-      selectedProvider: 'chutes',
       selectedModel: 'unsloth/gemma-3-27b-it',
-      selectedImageModel: 'glm-image',
+      selectedImageModel: 'z-image-turbo',
       selectedVisionModel: '',
       selectedVideoResolution: '480p',
       maxAgenticIterations: 3

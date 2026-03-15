@@ -5,8 +5,6 @@ export interface ImageContent {
   }
 }
 
-import type { RPGGameState, RPGRound, RPGAgent } from './rpg'
-
 export interface TextContent {
   type: 'text'
   text: string
@@ -63,13 +61,6 @@ export const availableTools: Tool[] = [
       'Generate videos with automatic quality verification and iterative refinement using vision models',
     icon: 'clapperboard',
     pattern: '@agentic_video'
-  },
-  {
-    id: 'rpg',
-    name: 'RPG Game',
-    description: 'Turn-based collaborative creation with multiple AI agents',
-    icon: 'gamepad-2',
-    pattern: '@rpg'
   }
 ]
 
@@ -134,10 +125,6 @@ export interface Message {
   agenticIterations?: AgenticIteration[] // Iterations from agentic image generation
   agenticVideoIterations?: AgenticVideoIteration[] // Iterations from agentic video generation
   imageAnalysis?: ImageAnalysis // Analysis results for display (agentic_image/video)
-  // RPG Game fields
-  rpgState?: RPGGameState // Game state for RPG mode
-  rpgRound?: RPGRound // Current round for RPG mode
-  rpgAgents?: RPGAgent[] // Active agents in RPG game
 }
 
 export interface Conversation {
@@ -150,10 +137,28 @@ export interface Conversation {
 
 export const IMAGE_MODELS = [
   {
-    id: 'glm-image',
-    name: 'GLM Image',
-    url: 'https://api.novita.ai/v3/async/glm-image'
-  }
+    id: 'z-image-turbo',
+    name: 'Z Image Turbo',
+    url: 'https://chutes-z-image-turbo.chutes.ai/generate'
+  },
+  {
+    id: 'Qwen-Image-2512',
+    name: 'Qwen Image 2512',
+    url: 'https://chutes-qwen-image-2512.chutes.ai/generate'
+  },
+  { id: 'chroma', name: 'Chroma', url: 'https://chutes-chroma.chutes.ai/generate' },
+  {
+    id: 'hunyuan-image-3',
+    name: 'Hunyuan Image 3',
+    url: 'https://chutes-hunyuan-image-3.chutes.ai/generate'
+  },
+  {
+    id: 'FLUX.1-schnell',
+    name: 'FLUX.1 Schnell',
+    url: 'https://chutes-flux-1-schnell.chutes.ai/generate'
+  },
+  { id: 'HassakuXL', name: 'HassakuXL', url: 'https://chutes-hassakuxl.chutes.ai/generate' },
+  { id: 'iLustMix', name: 'iLustMix', url: 'https://chutes-ilustmix.chutes.ai/generate' }
 ] as const
 
 export const VIDEO_RESOLUTIONS = [
@@ -164,7 +169,6 @@ export const VIDEO_RESOLUTIONS = [
 export interface Settings {
   apiKey: string
   instructions: string
-  selectedProvider: string
   selectedModel: string
   selectedImageModel: string
   selectedVisionModel: string
@@ -176,9 +180,6 @@ export interface Model {
   id: string
   name: string
   cost: number
-  providerId: string
-  providerName: string
-  providerApi?: string
   max_tokens?: number
   modalities?: {
     input: string[]

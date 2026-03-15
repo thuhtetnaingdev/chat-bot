@@ -327,7 +327,7 @@ export function usePlayground(
             id: crypto.randomUUID(),
             variantId,
             testCaseId: null,
-            model: 'seedream-5.0-lite',
+            model: 'qwen-image-edit',
             output,
             outputType: 'image',
             inputImage: activeSession.editImage,
